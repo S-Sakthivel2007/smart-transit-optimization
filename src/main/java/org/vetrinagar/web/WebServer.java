@@ -22,7 +22,7 @@ import java.util.*;
  */
 public class WebServer {
     private final TransportService service;
-    private final int port;
+    private int port;
     private HttpServer server;
     private final String staticResourceDir;
 
@@ -36,8 +36,32 @@ public class WebServer {
         this(service, 8080);
     }
 
+    public int getPort() {
+        return port;
+    }
+
     public void start() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(port), 0);
+        int[] portsToTry = {port, 8080, 8081, 8082, 8088, 3000};
+        IOException lastEx = null;
+        for (int p : portsToTry) {
+            try {
+                server = HttpServer.create(new InetSocketAddress("0.0.0.0", p), 0);
+                this.port = p;
+                lastEx = null;
+                break;
+            } catch (IOException e) {
+                lastEx = e;
+            }
+        }
+        if (server == null) {
+            // Try wildcard without explicit 0.0.0.0 string
+            try {
+                server = HttpServer.create(new InetSocketAddress(port), 0);
+            } catch (IOException e) {
+                if (lastEx != null) throw lastEx;
+                throw e;
+            }
+        }
 
         // API Endpoints
         server.createContext("/api/status", new StatusHandler());
@@ -492,6 +516,23 @@ public class WebServer {
 
             Path filePath = Paths.get(staticResourceDir, uriPath);
             File file = filePath.toFile();
+
+            if (!file.exists()) {
+                String[] candidateRoots = {
+                        "src/main/resources/web",
+                        "../src/main/resources/web",
+                        "C:/Users/sakth/.gemini/antigravity/scratch/smart-transit-optimization/src/main/resources/web",
+                        System.getProperty("user.dir") + "/src/main/resources/web"
+                };
+                for (String root : candidateRoots) {
+                    File candidate = new File(root, uriPath);
+                    if (candidate.exists()) {
+                        filePath = candidate.toPath();
+                        file = candidate;
+                        break;
+                    }
+                }
+            }
 
             if (!file.exists() || file.isDirectory()) {
                 String notFound = "<h1>404 Not Found</h1>";
