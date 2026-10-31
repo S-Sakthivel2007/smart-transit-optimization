@@ -3,6 +3,8 @@
 -- Database Schema & Seed Data for phpMyAdmin (MySQL / MariaDB)
 -- ==============================================================
 
+SET FOREIGN_KEY_CHECKS = 0;
+
 CREATE DATABASE IF NOT EXISTS `vetrinagar_transit` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `vetrinagar_transit`;
 
@@ -182,3 +184,5 @@ CREATE TABLE `traffic_logs` (
 
 INSERT INTO `traffic_logs` (`road_id`, `old_time`, `new_time`, `reason`, `logged_at`) VALUES
 (5, 20, 35, 'Peak hour IT corridor bottle-neck congestion', NOW());
+
+SET FOREIGN_KEY_CHECKS = 1;
