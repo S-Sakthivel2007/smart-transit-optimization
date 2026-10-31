@@ -50,6 +50,8 @@ public class WebServer {
         server.createContext("/api/supervisor/repair", new RepairBusHandler());
         server.createContext("/api/supervisor/dijkstra", new DijkstraQueryHandler());
         server.createContext("/api/login", new LoginHandler());
+        server.createContext("/api/database", new DatabaseOverviewHandler());
+        server.createContext("/api/database/table", new TableRowsHandler());
 
         // Static File Handler
         server.createContext("/", new StaticFileHandler());
@@ -423,6 +425,60 @@ public class WebServer {
             } else {
                 sendJsonResponse(exchange, 401, "{\"success\":false,\"message\":\"Invalid credentials. Try supervisor/admin123 or passenger1/pass123.\"}");
             }
+        }
+    }
+
+    private class DatabaseOverviewHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 204, "");
+                return;
+            }
+            Map<String, Object> meta = service.getDatabaseManager().getDatabaseOverview();
+            StringBuilder sb = new StringBuilder("{");
+            sb.append("\"driver\":\"").append(escapeJson((String) meta.get("driver"))).append("\",");
+            sb.append("\"url\":\"").append(escapeJson((String) meta.get("url"))).append("\",");
+            sb.append("\"databaseType\":\"").append(escapeJson((String) meta.get("databaseType"))).append("\",");
+            sb.append("\"connected\":true,");
+            sb.append("\"filePath\":\"").append(escapeJson((String) meta.get("filePath"))).append("\",");
+            sb.append("\"fileSizeFormatted\":\"").append(escapeJson((String) meta.get("fileSizeFormatted"))).append("\",");
+
+            sb.append("\"tables\":{");
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> counts = (Map<String, Integer>) meta.get("tableCounts");
+            if (counts != null) {
+                int i = 0;
+                for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+                    sb.append("\"").append(entry.getKey()).append("\":").append(entry.getValue());
+                    if (i++ < counts.size() - 1) sb.append(",");
+                }
+            }
+            sb.append("}}");
+            sendJsonResponse(exchange, 200, sb.toString());
+        }
+    }
+
+    private class TableRowsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 204, "");
+                return;
+            }
+            String query = exchange.getRequestURI().getQuery();
+            String tableName = "stops";
+            if (query != null && query.contains("name=")) {
+                for (String param : query.split("&")) {
+                    String[] pair = param.split("=", 2);
+                    if (pair.length == 2 && "name".equalsIgnoreCase(pair[0])) {
+                        tableName = pair[1];
+                        break;
+                    }
+                }
+            }
+            String json = service.getDatabaseManager().getTableRowsJson(tableName);
+            sendJsonResponse(exchange, 200, json);
         }
     }
 

@@ -529,6 +529,10 @@ public class TransportService {
         return roadNetwork;
     }
 
+    public DatabaseManager getDatabaseManager() {
+        return dbManager;
+    }
+
     public DemandPolicy getDemandPolicy() {
         return demandPolicy;
     }

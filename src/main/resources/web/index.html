@@ -36,14 +36,23 @@
                 <span class="sdg-badge sdg-13" title="Climate Action">SDG 13</span>
             </div>
 
-            <!-- Role Selector -->
+            <!-- Role & View Selector -->
             <div class="role-selector">
                 <button id="role-supervisor-btn" class="role-btn active" onclick="switchRole('SUPERVISOR')">
-                    <span class="dot dot-supervisor"></span> Supervisor View
+                    <span class="dot dot-supervisor"></span> Supervisor
                 </button>
                 <button id="role-passenger-btn" class="role-btn" onclick="switchRole('PASSENGER')">
-                    <span class="dot dot-passenger"></span> Passenger View
+                    <span class="dot dot-passenger"></span> Passenger
                 </button>
+                <button id="role-database-btn" class="role-btn" onclick="switchRole('DATABASE')">
+                    <span class="dot dot-database"></span> Database (SQLite)
+                </button>
+            </div>
+
+            <!-- Database Status Indicator -->
+            <div id="db-status-pill" class="db-status-pill" title="Relational Database Status">
+                <span class="db-status-dot"></span>
+                <span id="db-status-text">SQLite: Connected</span>
             </div>
 
             <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Theme">
@@ -368,6 +377,80 @@
                                 </tr>
                             </thead>
                             <tbody id="trips-table-body">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- DATABASE CONNECTIVITY & EXPLORER SECTION -->
+        <!-- ============================================================== -->
+        <section id="database-section" class="role-section hidden">
+            <!-- Database Connection Summary Cards -->
+            <div class="db-overview-grid">
+                <div class="card glass-card">
+                    <div class="card-body">
+                        <div class="kpi-label">Database Engine</div>
+                        <div class="kpi-value highlight-cyan" id="db-engine-val">SQLite 3 (ACID)</div>
+                        <div class="kpi-caption" id="db-driver-val">JDBC: org.sqlite.JDBC</div>
+                    </div>
+                </div>
+                <div class="card glass-card">
+                    <div class="card-body">
+                        <div class="kpi-label">Storage File</div>
+                        <div class="kpi-value highlight-emerald" id="db-filename-val">vetrinagar_transit.db</div>
+                        <div class="kpi-caption" id="db-filesize-val">Size: 64.00 KB</div>
+                    </div>
+                </div>
+                <div class="card glass-card">
+                    <div class="card-body">
+                        <div class="kpi-label">Connection Health</div>
+                        <div class="kpi-value highlight-emerald" id="db-status-val">ONLINE & CONNECTED</div>
+                        <div class="kpi-caption">Zero-latency embedded storage</div>
+                    </div>
+                </div>
+                <div class="card glass-card">
+                    <div class="card-body">
+                        <div class="kpi-label">Schema Coverage</div>
+                        <div class="kpi-value highlight-indigo" id="db-tables-val">8 Relational Tables</div>
+                        <div class="kpi-caption">Normalized transit entities</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Selector & Live SQL Viewer -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h2>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                        </svg>
+                        Relational Database Tables Explorer
+                    </h2>
+                    <div class="table-switch-toolbar" id="table-buttons-toolbar">
+                        <!-- Dynamic table buttons -->
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="callout callout-info" style="margin-bottom: 1rem;">
+                        <div class="callout-icon">🗄️</div>
+                        <div class="callout-content">
+                            <strong>Live Database Connectivity:</strong>
+                            <p>Every stop, road weight, bus dispatch, passenger reservation, and traffic log is persistently committed to <code>vetrinagar_transit.db</code> via JDBC transactions. Select a table above to inspect the live records.</p>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table" id="db-data-table">
+                            <thead id="db-table-head">
+                                <!-- Dynamic headers -->
+                            </thead>
+                            <tbody id="db-table-body">
                                 <!-- Dynamic rows -->
                             </tbody>
                         </table>

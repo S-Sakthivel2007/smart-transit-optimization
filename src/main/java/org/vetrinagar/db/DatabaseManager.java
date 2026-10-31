@@ -601,6 +601,89 @@ public class DatabaseManager {
         }
     }
 
+    public String getDbPath() {
+        return dbPath;
+    }
+
+    public String getJdbcUrl() {
+        return jdbcUrl;
+    }
+
+    public Map<String, Object> getDatabaseOverview() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("driver", "org.sqlite.JDBC");
+        map.put("url", jdbcUrl);
+        map.put("databaseType", "SQLite Relational Database");
+        map.put("connected", true);
+
+        File f = new File(dbPath);
+        map.put("filePath", f.getAbsolutePath());
+        map.put("fileSizeBytes", f.exists() ? f.length() : 0);
+        map.put("fileSizeFormatted", String.format("%.2f KB", (f.exists() ? f.length() : 0) / 1024.0));
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        String[] tables = {"stops", "roads", "buses", "demand_batches", "demand_requests", "relief_trips", "traffic_logs", "users"};
+        try (Connection conn = getConnection(); Statement st = conn.createStatement()) {
+            for (String t : tables) {
+                try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + t)) {
+                    if (rs.next()) counts.put(t, rs.getInt(1));
+                } catch (Exception e) {
+                    counts.put(t, 0);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[DB ERROR] getDatabaseOverview: " + e.getMessage());
+        }
+        map.put("tableCounts", counts);
+        return map;
+    }
+
+    public String getTableRowsJson(String tableName) {
+        // Sanitize table name against known tables
+        List<String> validTables = Arrays.asList("stops", "roads", "buses", "demand_batches", "demand_requests", "relief_trips", "traffic_logs", "users");
+        if (!validTables.contains(tableName.toLowerCase())) {
+            return "{\"columns\":[],\"rows\":[]}";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"tableName\":\"").append(tableName).append("\",");
+
+        try (Connection conn = getConnection(); Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM " + tableName + " LIMIT 100")) {
+            ResultSetMetaData meta = rs.getMetaData();
+            int colCount = meta.getColumnCount();
+
+            sb.append("\"columns\":[");
+            for (int i = 1; i <= colCount; i++) {
+                sb.append("\"").append(meta.getColumnName(i)).append("\"");
+                if (i < colCount) sb.append(",");
+            }
+            sb.append("],\"rows\":[");
+
+            boolean firstRow = true;
+            while (rs.next()) {
+                if (!firstRow) sb.append(",");
+                firstRow = false;
+
+                sb.append("[");
+                for (int i = 1; i <= colCount; i++) {
+                    String val = rs.getString(i);
+                    if (val == null) {
+                        sb.append("null");
+                    } else {
+                        sb.append("\"").append(val.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")).append("\"");
+                    }
+                    if (i < colCount) sb.append(",");
+                }
+                sb.append("]");
+            }
+            sb.append("]}");
+            return sb.toString();
+        } catch (SQLException e) {
+            return "{\"error\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}";
+        }
+    }
+
     public void logTrafficChange(int roadId, int oldTime, int newTime, String reason) {
         String sql = "INSERT INTO traffic_logs (road_id, old_time, new_time, reason, logged_at) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {

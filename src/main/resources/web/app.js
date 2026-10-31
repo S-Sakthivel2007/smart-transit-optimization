@@ -14,33 +14,48 @@ let state = {
     metrics: {},
     activeHighlightedPath: [],
     lastSubmittedRequest: null,
-    selectedRoadForTraffic: null
+    selectedRoadForTraffic: null,
+    dbInfo: null,
+    activeDbTable: 'stops'
 };
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
     fetchTransitData();
+    fetchDatabaseInfo();
     setInterval(fetchTransitData, 4000); // Poll status every 4 seconds
 });
 
-// --- Role Switching ---
+// --- Role & View Switching ---
 function switchRole(role) {
     state.currentRole = role;
     const supBtn = document.getElementById('role-supervisor-btn');
     const passBtn = document.getElementById('role-passenger-btn');
+    const dbBtn = document.getElementById('role-database-btn');
+
     const supSec = document.getElementById('supervisor-section');
     const passSec = document.getElementById('passenger-section');
+    const dbSec = document.getElementById('database-section');
+
+    supBtn.classList.remove('active');
+    passBtn.classList.remove('active');
+    if (dbBtn) dbBtn.classList.remove('active');
+
+    supSec.classList.add('hidden');
+    passSec.classList.add('hidden');
+    if (dbSec) dbSec.classList.add('hidden');
 
     if (role === 'SUPERVISOR') {
         supBtn.classList.add('active');
-        passBtn.classList.remove('active');
         supSec.classList.remove('hidden');
-        passSec.classList.add('hidden');
-    } else {
+    } else if (role === 'PASSENGER') {
         passBtn.classList.add('active');
-        supBtn.classList.remove('active');
         passSec.classList.remove('hidden');
-        supSec.classList.add('hidden');
+    } else if (role === 'DATABASE') {
+        if (dbBtn) dbBtn.classList.add('active');
+        if (dbSec) dbSec.classList.remove('hidden');
+        fetchDatabaseInfo();
+        loadTableData(state.activeDbTable || 'stops');
     }
 }
 
@@ -671,4 +686,98 @@ function showToast(message, type = 'info') {
         toast.style.transition = '0.3s';
         setTimeout(() => toast.remove(), 300);
     }, 4500);
+}
+
+// --- Database Connectivity & Table Explorer ---
+async function fetchDatabaseInfo() {
+    try {
+        const res = await fetch('/api/database');
+        if (!res.ok) return;
+        const data = await res.json();
+        state.dbInfo = data;
+
+        const pillText = document.getElementById('db-status-text');
+        if (pillText) {
+            pillText.innerText = `SQLite: Connected (${data.fileSizeFormatted || '64 KB'})`;
+        }
+
+        const engineVal = document.getElementById('db-engine-val');
+        const driverVal = document.getElementById('db-driver-val');
+        const fileVal = document.getElementById('db-filename-val');
+        const sizeVal = document.getElementById('db-filesize-val');
+        const statusVal = document.getElementById('db-status-val');
+
+        if (engineVal) engineVal.innerText = data.databaseType || 'SQLite 3 (ACID)';
+        if (driverVal) driverVal.innerText = `JDBC: ${data.driver}`;
+        if (fileVal) fileVal.innerText = 'vetrinagar_transit.db';
+        if (sizeVal) sizeVal.innerText = `Size: ${data.fileSizeFormatted || '64.00 KB'}`;
+        if (statusVal) statusVal.innerText = 'ONLINE & CONNECTED';
+
+        renderTableButtons(data.tables || {});
+    } catch (e) {
+        console.warn('Database info fetch error (offline mode):', e);
+        const pillText = document.getElementById('db-status-text');
+        if (pillText) pillText.innerText = 'SQLite: Local Demo Mode';
+    }
+}
+
+function renderTableButtons(tableCounts) {
+    const toolbar = document.getElementById('table-buttons-toolbar');
+    if (!toolbar) return;
+
+    const tables = ['stops', 'roads', 'buses', 'demand_batches', 'demand_requests', 'relief_trips', 'traffic_logs', 'users'];
+    let html = '';
+    tables.forEach(t => {
+        const count = tableCounts[t] !== undefined ? tableCounts[t] : '';
+        const countBadge = count !== '' ? ` (${count})` : '';
+        const activeClass = (state.activeDbTable === t) ? 'active' : '';
+        html += `<button class="btn-table ${activeClass}" onclick="loadTableData('${t}')">${t}${countBadge}</button>`;
+    });
+    toolbar.innerHTML = html;
+}
+
+async function loadTableData(tableName) {
+    state.activeDbTable = tableName;
+    renderTableButtons(state.dbInfo ? state.dbInfo.tables : {});
+
+    const head = document.getElementById('db-table-head');
+    const body = document.getElementById('db-table-body');
+    if (!head || !body) return;
+
+    head.innerHTML = `<tr><th>Loading ${tableName}...</th></tr>`;
+    body.innerHTML = `<tr><td>Querying relational table from SQLite...</td></tr>`;
+
+    try {
+        const res = await fetch(`/api/database/table?name=${tableName}`);
+        if (!res.ok) throw new Error('Query error');
+        const data = await res.json();
+
+        // Render Headers
+        let headHtml = '<tr>';
+        (data.columns || []).forEach(col => {
+            headHtml += `<th>${col}</th>`;
+        });
+        headHtml += '</tr>';
+        head.innerHTML = headHtml;
+
+        // Render Rows
+        if (!data.rows || data.rows.length === 0) {
+            body.innerHTML = `<tr><td colspan="${(data.columns || []).length}" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Table is empty (0 records).</td></tr>`;
+            return;
+        }
+
+        let bodyHtml = '';
+        data.rows.forEach(row => {
+            bodyHtml += '<tr>';
+            row.forEach(cell => {
+                const val = (cell === null) ? '<span style="color:var(--text-muted); font-style:italic;">NULL</span>' : cell;
+                bodyHtml += `<td>${val}</td>`;
+            });
+            bodyHtml += '</tr>';
+        });
+        body.innerHTML = bodyHtml;
+    } catch (e) {
+        head.innerHTML = `<tr><th>Status</th><th>Error</th></tr>`;
+        body.innerHTML = `<tr><td>Database Offline</td><td>Could not load table ${tableName}. Ensure Java backend is running on port 8080.</td></tr>`;
+    }
 }
