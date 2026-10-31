@@ -79,6 +79,13 @@ public class WebServer {
         server.createContext("/api/database", new DatabaseOverviewHandler());
         server.createContext("/api/database/table", new TableRowsHandler());
 
+        // Redirect /phpmyadmin on port 8080 to XAMPP Apache phpMyAdmin on port 80
+        server.createContext("/phpmyadmin", exchange -> {
+            exchange.getResponseHeaders().set("Location", "http://localhost/phpmyadmin/");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+
         // Static File Handler
         server.createContext("/", new StaticFileHandler());
 
