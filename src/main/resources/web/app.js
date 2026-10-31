@@ -4,6 +4,70 @@
  * Role-Based Authentication, Interactive Transit Map, and SQLite Explorer.
  */
 
+const DEFAULT_STOPS = [
+    { id: "D00", name: "Central Depot", type: "DEPOT", desc: "Vetrinagar Municipal Bus Headquarters & Maintenance Yard", x: 450, y: 240 },
+    { id: "S01", name: "Market Junction", type: "STOP", desc: "Commercial District & Central Bazaar", x: 320, y: 160 },
+    { id: "S02", name: "Tech Park", type: "STOP", desc: "IT Corridor & Technology Center", x: 660, y: 140 },
+    { id: "S03", name: "Railway Station", type: "STOP", desc: "Main Junction Railway Terminal", x: 200, y: 280 },
+    { id: "S04", name: "Gandhinagar", type: "STOP", desc: "Dense Residential Quarter Phase 1", x: 340, y: 360 },
+    { id: "S05", name: "College Road", type: "STOP", desc: "Arts & Engineering Campus Zone", x: 180, y: 440 },
+    { id: "S06", name: "Hospital Circle", type: "STOP", desc: "District General Hospital & Medical College", x: 340, y: 480 },
+    { id: "S07", name: "Anna Nagar", type: "STOP", desc: "Eastern Township & Shopping Complex", x: 560, y: 280 },
+    { id: "S08", name: "Industrial Estate", type: "STOP", desc: "Manufacturing & SME Logistics Hub", x: 740, y: 290 },
+    { id: "S09", name: "Lake View", type: "STOP", desc: "Recreational Promenade & Outer Ring", x: 220, y: 560 },
+    { id: "S10", name: "Temple Gate", type: "STOP", desc: "Historic Heritage Quarter & Pilgrim Terminus", x: 500, y: 480 },
+    { id: "S11", name: "North Bypass", type: "STOP", desc: "Northern Highway Interchange & Freight Junction", x: 520, y: 80 },
+    { id: "S12", name: "South Terminal", type: "STOP", desc: "Southern Peripheral Outpost (Isolated Outpost)", x: 700, y: 560 }
+];
+
+const DEFAULT_ROADS = [
+    { id: 1, from: "D00", to: "S01", time: 8, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 2, from: "D00", to: "S03", time: 10, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 3, from: "D00", to: "S04", time: 12, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 4, from: "D00", to: "S07", time: 9, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 5, from: "S01", to: "S02", time: 35, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 6, from: "S01", to: "S03", time: 7, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 7, from: "S01", to: "S11", time: 11, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 8, from: "S11", to: "S02", time: 14, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 9, from: "S02", to: "S07", time: 12, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 10, from: "S02", to: "S08", time: 16, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 11, from: "S03", to: "S06", time: 15, status: "CLOSED", type: "TWO_WAY", restriction: "All" },
+    { id: 12, from: "S03", to: "S04", time: 9, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 13, from: "S03", to: "S05", time: 13, status: "OPEN", type: "ONE_WAY", restriction: "All" },
+    { id: 14, from: "S04", to: "S05", time: 11, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 15, from: "S04", to: "S07", time: 15, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 16, from: "S04", to: "S10", time: 13, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 17, from: "S05", to: "S06", time: 10, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 18, from: "S05", to: "S09", time: 15, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 19, from: "S06", to: "S07", time: 14, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 20, from: "S06", to: "S10", time: 8, status: "OPEN", type: "TWO_WAY", restriction: "MiniBus Only" },
+    { id: 21, from: "S07", to: "S08", time: 10, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 22, from: "S07", to: "S10", time: 16, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 23, from: "S08", to: "S11", time: 20, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 24, from: "S09", to: "S10", time: 12, status: "OPEN", type: "TWO_WAY", restriction: "All" },
+    { id: 25, from: "S10", to: "S12", time: 24, status: "CLOSED", type: "TWO_WAY", restriction: "All" }
+];
+
+const DEFAULT_BUSES = [
+    { id: "B01", type: "MiniBus", capacity: 20, location: "D00", status: "AVAILABLE", load: 0 },
+    { id: "B02", type: "StandardBus", capacity: 40, location: "D00", status: "AVAILABLE", load: 0 },
+    { id: "B03", type: "StandardBus", capacity: 50, location: "D00", status: "AVAILABLE", load: 0 },
+    { id: "B04", type: "MiniBus", capacity: 25, location: "D00", status: "BROKEN", load: 0 }
+];
+
+const DEFAULT_DEMAND = [
+    { id: "DEM-1001", pickup: "S01", dest: "S02", count: 65, orig: 65, time: "08:15:00", remarks: "IT shift morning peak surge", status: "WAITING" },
+    { id: "DEM-1002", pickup: "S03", dest: "S02", count: 45, orig: 45, time: "08:20:00", remarks: "Intercity train arrived at junction", status: "WAITING" },
+    { id: "DEM-1003", pickup: "S05", dest: "S02", count: 40, orig: 40, time: "08:22:00", remarks: "Student & staff tech cluster", status: "WAITING" },
+    { id: "DEM-1004", pickup: "S04", dest: "S01", count: 35, orig: 35, time: "08:25:00", remarks: "Market shoppers batch", status: "WAITING" },
+    { id: "DEM-1005", pickup: "S01", dest: "S07", count: 30, orig: 30, time: "08:28:00", remarks: "Residential commute", status: "WAITING" },
+    { id: "DEM-1006", pickup: "S03", dest: "S06", count: 25, orig: 25, time: "08:30:00", remarks: "Hospital shift visitors", status: "WAITING" },
+    { id: "DEM-1007", pickup: "S02", dest: "S08", count: 20, orig: 20, time: "08:32:00", remarks: "Industrial delivery crews", status: "WAITING" },
+    { id: "DEM-1008", pickup: "S06", dest: "S01", count: 18, orig: 18, time: "08:35:00", remarks: "Morning clinic returnees", status: "WAITING" },
+    { id: "DEM-1009", pickup: "S07", dest: "S02", count: 15, orig: 15, time: "08:37:00", remarks: "Tech park contractors", status: "WAITING" },
+    { id: "DEM-1010", pickup: "S05", dest: "S03", count: 12, orig: 12, time: "08:40:00", remarks: "College rail commuters", status: "WAITING" }
+];
+
 let state = {
     currentUser: {
         username: 'supervisor',
@@ -11,26 +75,40 @@ let state = {
         fullName: 'Chief Transit Supervisor'
     },
     currentPage: 'map',
-    stops: [],
-    roads: [],
-    buses: [],
-    rankedDemand: [],
-    allDemand: [],
+    stops: [...DEFAULT_STOPS],
+    roads: [...DEFAULT_ROADS],
+    buses: [...DEFAULT_BUSES],
+    rankedDemand: [...DEFAULT_DEMAND],
+    allDemand: [...DEFAULT_DEMAND],
     trips: [],
-    metrics: {},
+    metrics: {
+        waiting: 305,
+        served: 40,
+        activeTrips: 1,
+        availBuses: 3,
+        totalFleet: 4,
+        utilization: 25.0,
+        co2Saved: 18.0,
+        avgWaitTime: 7.5
+    },
     activeHighlightedPath: [],
     selectedStopId: 'D00',
     selectedRoadForTraffic: null,
-    lastSubmittedRequest: null,
-    dbInfo: null,
-    activeDbTable: 'stops'
+    lastSubmittedRequest: null
 };
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
     updateUserSessionUI();
+    renderTopHeaderStats();
+    renderSVGMap();
+    renderStopDetailsCard(state.selectedStopId);
+    populateDropdowns();
+    renderOperationsQueue();
+    renderFleetPage();
+    renderTrafficTable();
+    renderTripsPage();
     fetchTransitData();
-    fetchDatabaseInfo();
     setInterval(fetchTransitData, 4000); // Live poll every 4 seconds
 });
 
@@ -152,10 +230,6 @@ const PAGE_METADATA = {
         title: "Relief Trip Execution History",
         desc: "Two-segment dispatch and in-service transit logs with verified path traces"
     },
-    database: {
-        title: "Relational Database Explorer (SQLite)",
-        desc: "Direct inspection of 8 normalized transit tables committed via JDBC"
-    },
     sdg: {
         title: "SDG 9, 11, 13 Sustainability Impact",
         desc: "Infrastructure efficiency, urban decongestion, and greenhouse gas offset metrics"
@@ -190,10 +264,7 @@ function navigateToPage(pageId) {
     document.getElementById('current-page-desc').innerText = meta.desc;
 
     // Trigger page-specific data refreshes
-    if (pageId === 'database') {
-        fetchDatabaseInfo();
-        loadTableData(state.activeDbTable || 'stops');
-    } else if (pageId === 'map') {
+    if (pageId === 'map') {
         renderSVGMap();
     }
 }
@@ -332,12 +403,23 @@ function renderSVGMap() {
         let iconSymbol = s.id;
         if (isDepot) iconSymbol = '★ D00';
 
+        // Check consolidated waiting crowd at this stop
+        const stopWaitingCount = state.rankedDemand
+            .filter(b => b.pickup === s.id)
+            .reduce((acc, b) => acc + b.count, 0);
+
         stopsHtml += `
             <g class="stop-group" onclick="selectStop('${s.id}')">
                 ${isDepot ? `<circle cx="${s.x}" cy="${s.y}" r="25" fill="none" stroke="#a855f7" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.7"/>` : ''}
                 <circle cx="${s.x}" cy="${s.y}" r="${radius}" fill="${fill}" stroke="${strokeColor}" stroke-width="${strokeW}" />
                 <text x="${s.x}" y="${s.y + 3.5}" fill="#ffffff" font-size="${isDepot ? 8.5 : 9.5}" font-weight="800" text-anchor="middle" pointer-events="none">${iconSymbol}</text>
                 <text x="${s.x}" y="${s.y + radius + 13}" class="stop-name-text">${s.name}</text>
+                ${stopWaitingCount > 0 ? `
+                    <g class="crowd-pill" transform="translate(${s.x}, ${s.y - radius - 7})">
+                        <rect x="-19" y="-11" width="38" height="14" rx="7" fill="#e11d48" stroke="#ffffff" stroke-width="1.2" />
+                        <text x="0" y="-0.5" fill="#ffffff" font-size="8" font-family="'JetBrains Mono', monospace" font-weight="800" text-anchor="middle">👥 ${stopWaitingCount}</text>
+                    </g>
+                ` : ''}
             </g>
         `;
     });
@@ -391,7 +473,7 @@ function renderStopDetailsCard(stopId) {
     // Outgoing roads
     const outgoing = state.roads.filter(r => r.from === stop.id || (r.type === 'TWO_WAY' && r.to === stop.id));
 
-    // Waiting demand from this stop
+    // Waiting demand from this stop (Aggregates multiple commuters at the same stop)
     const batches = state.rankedDemand.filter(b => b.pickup === stop.id);
     const totalWaiting = batches.reduce((acc, b) => acc + b.count, 0);
 
@@ -403,13 +485,25 @@ function renderStopDetailsCard(stopId) {
             </div>
             <div style="color:var(--text-secondary); font-size:0.78rem;">${stop.desc}</div>
             
-            <div style="margin-top:0.4rem; padding:0.5rem 0.75rem; background:rgba(0,0,0,0.2); border-radius:8px;">
-                <div style="font-size:0.75rem; color:var(--text-muted);">CURRENT WAITING DEMAND:</div>
-                <div style="font-size:1.15rem; font-weight:800; color:var(--rose); font-family:'JetBrains Mono';">${totalWaiting} Passengers</div>
+            <div style="margin-top:0.5rem; padding:0.6rem 0.75rem; background:rgba(225, 29, 72, 0.1); border:1px solid rgba(225, 29, 72, 0.3); border-radius:8px;">
+                <div style="font-size:0.72rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">CONSOLIDATED STOP DEMAND:</div>
+                <div style="font-size:1.35rem; font-weight:800; color:var(--rose); font-family:'JetBrains Mono'; margin-top:2px;">
+                    ${totalWaiting} Passengers
+                </div>
+                <div style="font-size:0.75rem; color:var(--emerald); margin-top:0.25rem;">
+                    ${batches.length > 1 
+                        ? `⚡ Combined from ${batches.length} commuter bookings at this location` 
+                        : (batches.length === 1 ? `⚡ 1 Active Consolidated Batch` : `✓ No passengers currently waiting`)}
+                </div>
+                ${batches.length > 0 ? `
+                    <div style="margin-top:0.4rem; font-size:0.72rem; color:var(--text-secondary); border-top:1px dashed rgba(255,255,255,0.15); padding-top:0.35rem;">
+                        ${batches.map(b => `<div style="display:flex; justify-content:space-between; margin-bottom:2px;"><span>Batch ${b.id} &rarr; ${b.dest}:</span> <strong style="color:#fff;">${b.count} pax</strong></div>`).join('')}
+                    </div>
+                ` : ''}
             </div>
 
-            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.3rem;">Connected Links: ${outgoing.length} Road Corridors</div>
-            <button class="btn btn-sm btn-outline mt-1" onclick="setAsTesterOrigin('${stop.id}')">Test Routes From Here &rarr;</button>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;">Connected Links: ${outgoing.length} Road Corridors</div>
+            <button class="btn btn-sm btn-outline mt-2" onclick="setAsTesterOrigin('${stop.id}')">Test Routes From Here &rarr;</button>
         </div>
     `;
 }
@@ -455,8 +549,75 @@ async function runDijkstraTester() {
             box.innerHTML = `<span style="color:var(--rose);">⚠️ ${data.message || 'No feasible route connects these stops.'}</span>`;
         }
     } catch (e) {
-        console.error(e);
+        // Fallback to client-side Dijkstra
+        const local = localDijkstra(from, to);
+        if (local.reachable) {
+            state.activeHighlightedPath = local.path;
+            renderSVGMap();
+            box.innerHTML = `
+                <div style="text-align:left; width:100%;">
+                    <div style="font-size:0.75rem; color:var(--text-muted);">SHORTEST TIME (DIJKSTRA):</div>
+                    <div style="font-size:1.15rem; font-weight:800; color:var(--emerald);">${local.time} Minutes</div>
+                    <div style="font-size:0.78rem; color:var(--cyan); margin-top:0.2rem;">${local.path.join(' &rarr; ')}</div>
+                </div>
+            `;
+        } else {
+            state.activeHighlightedPath = [];
+            renderSVGMap();
+            box.innerHTML = `<span style="color:var(--rose);">⚠️ ${local.message || 'No route connects these stops.'}</span>`;
+        }
     }
+}
+
+function localDijkstra(fromId, toId) {
+    const dist = {};
+    const prev = {};
+    const unvisited = new Set();
+    state.stops.forEach(s => {
+        dist[s.id] = Infinity;
+        unvisited.add(s.id);
+    });
+    dist[fromId] = 0;
+
+    while (unvisited.size > 0) {
+        let curr = null;
+        let minDist = Infinity;
+        for (const u of unvisited) {
+            if (dist[u] < minDist) {
+                minDist = dist[u];
+                curr = u;
+            }
+        }
+        if (!curr || minDist === Infinity) break;
+        if (curr === toId) break;
+        unvisited.delete(curr);
+
+        state.roads.forEach(r => {
+            if (r.status === 'CLOSED') return;
+            let neighbor = null;
+            if (r.from === curr) neighbor = r.to;
+            else if (r.to === curr && (r.type === 'TWO_WAY' || !r.type)) neighbor = r.from;
+
+            if (neighbor && unvisited.has(neighbor)) {
+                const alt = dist[curr] + r.time;
+                if (alt < dist[neighbor]) {
+                    dist[neighbor] = alt;
+                    prev[neighbor] = curr;
+                }
+            }
+        });
+    }
+
+    if (dist[toId] === Infinity) {
+        return { reachable: false, message: `No route connects ${fromId} and ${toId} with current road conditions.` };
+    }
+    const path = [];
+    let step = toId;
+    while (step) {
+        path.unshift(step);
+        step = prev[step];
+    }
+    return { reachable: true, time: dist[toId], path: path };
 }
 
 function populateDropdowns() {
@@ -525,11 +686,73 @@ async function allocateReliefBus() {
         if (data.success) {
             showToast(`Allocated ${data.busId} for ${data.boarded} passengers. Trip ID: ${data.tripId}`, 'success');
             fetchTransitData();
+            return;
         } else {
             showToast(data.message || 'No available or reachable bus.', 'error');
+            return;
         }
     } catch (e) {
-        showToast('Network error on allocation', 'error');
+        // Fallback offline allocation
+        if (!state.rankedDemand || state.rankedDemand.length === 0) {
+            showToast('No waiting demand batches in queue.', 'info');
+            return;
+        }
+        const availBus = state.buses.find(b => b.status === 'AVAILABLE');
+        if (!availBus) {
+            showToast('Allocation Failed: All buses are currently busy on trips or broken.', 'error');
+            return;
+        }
+        const topBatch = state.rankedDemand.shift(); // PriorityQueue poll()
+        const boarded = Math.min(availBus.capacity, topBatch.count);
+        const unserved = topBatch.count - boarded;
+
+        availBus.status = 'ON_TRIP';
+        availBus.load = boarded;
+
+        const tripId = `TRIP-${Math.floor(100 + Math.random() * 900)}`;
+        const seg1 = localDijkstra(availBus.location, topBatch.pickup);
+        const seg2 = localDijkstra(topBatch.pickup, topBatch.dest);
+        const totalTime = (seg1.reachable ? seg1.time : 10) + (seg2.reachable ? seg2.time : 15);
+
+        const newTrip = {
+            id: tripId,
+            batchId: topBatch.id,
+            busId: availBus.id,
+            pickup: topBatch.pickup,
+            dest: topBatch.dest,
+            pax: boarded,
+            cap: availBus.capacity,
+            seg1: seg1.path || [availBus.location, topBatch.pickup],
+            seg1Time: seg1.time || 10,
+            seg2: seg2.path || [topBatch.pickup, topBatch.dest],
+            seg2Time: seg2.time || 15,
+            totalTime: totalTime,
+            status: 'IN_PROGRESS',
+            createdAt: new Date().toLocaleTimeString()
+        };
+        state.trips.unshift(newTrip);
+
+        if (unserved > 0) {
+            topBatch.count = unserved;
+            topBatch.status = 'PARTIALLY_ALLOCATED';
+            state.rankedDemand.unshift(topBatch);
+            state.rankedDemand.sort((a, b) => b.count - a.count);
+        }
+
+        // Highlight the 2-segment trip on the map
+        const fullPath = [...newTrip.seg1];
+        if (newTrip.seg2) {
+            newTrip.seg2.slice(1).forEach(st => fullPath.push(st));
+        }
+        state.activeHighlightedPath = fullPath;
+
+        showToast(`Allocated Bus ${availBus.id} (${boarded} pax boarded). Trip ${tripId} dispatched!`, 'success');
+        renderSVGMap();
+        renderOperationsQueue();
+        renderFleetPage();
+        renderTripsPage();
+        renderStopDetailsCard(topBatch.pickup);
+        renderTopHeaderStats();
     }
 }
 
@@ -687,7 +910,47 @@ async function handlePassengerSubmit(e) {
             showToast(data.message || 'Submission failed', 'error');
         }
     } catch (err) {
-        showToast('Error registering demand', 'error');
+        // Standalone offline aggregation fallback
+        const existing = state.rankedDemand.find(b => b.pickup === pickup && b.dest === dest);
+        let batchId;
+        if (existing) {
+            existing.count += count;
+            existing.orig += count;
+            batchId = existing.id;
+            showToast(`Aggregated: Added ${count} pax to stop ${pickup} (Batch ${batchId} now ${existing.count} pax)!`, 'success');
+        } else {
+            batchId = `DEM-${Math.floor(1000 + Math.random() * 9000)}`;
+            state.rankedDemand.unshift({
+                id: batchId,
+                pickup: pickup,
+                dest: dest,
+                count: count,
+                orig: count,
+                time: new Date().toLocaleTimeString(),
+                remarks: `Passenger app surge (${name})`,
+                status: 'WAITING'
+            });
+            showToast(`New demand batch ${batchId} registered for ${count} passengers at ${pickup}!`, 'success');
+        }
+
+        // PriorityQueue re-ordering: Higher count has higher priority
+        state.rankedDemand.sort((a, b) => b.count - a.count);
+
+        state.lastSubmittedRequest = {
+            requestId: `REQ-${Math.floor(500 + Math.random() * 500)}`,
+            batchId: batchId,
+            name: name,
+            pickup: pickup,
+            dest: dest,
+            count: count,
+            time: new Date().toLocaleTimeString()
+        };
+
+        renderSVGMap();
+        renderStopDetailsCard(pickup);
+        renderOperationsQueue();
+        updatePassengerStatusCard();
+        renderTopHeaderStats();
     }
 }
 

@@ -243,6 +243,18 @@ public class WebServer {
             }
             sb.append("],");
 
+            // Consolidated Stop-Level Crowds
+            sb.append("\"stopCrowds\":[");
+            List<TransportService.StopCrowdSummary> crowds = service.getStopCrowdSummaries();
+            for (int i = 0; i < crowds.size(); i++) {
+                TransportService.StopCrowdSummary c = crowds.get(i);
+                sb.append(String.format("{\"id\":\"%s\",\"name\":\"%s\",\"pax\":%d,\"reqCount\":%d,\"breakdown\":[\"%s\"]}",
+                        escapeJson(c.stopId()), escapeJson(c.stopName()), c.totalWaitingPax(), c.requestCount(),
+                        String.join("\",\"", c.breakdowns())));
+                if (i < crowds.size() - 1) sb.append(",");
+            }
+            sb.append("],");
+
             // Metrics
             TransportService.TransitMetrics m = service.calculateMetrics();
             sb.append(String.format("\"metrics\":{\"waiting\":%d,\"served\":%d,\"activeTrips\":%d,\"availBuses\":%d,\"totalFleet\":%d,\"utilization\":%.1f,\"co2Saved\":%.2f,\"avgWaitTime\":%.1f}",

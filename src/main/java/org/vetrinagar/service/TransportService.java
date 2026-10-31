@@ -555,6 +555,52 @@ public class TransportService {
         return null;
     }
 
+    public record StopCrowdSummary(
+            String stopId,
+            String stopName,
+            int totalWaitingPax,
+            int requestCount,
+            List<String> breakdowns
+    ) {}
+
+    /**
+     * Aggregates all waiting passenger demands at each physical stop location.
+     * Combines multiple commuter demands (e.g. 5 pax + 20 pax = 25 pax) into unified stop-level metrics.
+     */
+    public List<StopCrowdSummary> getStopCrowdSummaries() {
+        Map<String, Integer> stopTotal = new LinkedHashMap<>();
+        Map<String, List<String>> stopBreakdown = new LinkedHashMap<>();
+        Map<String, Integer> stopReqCount = new LinkedHashMap<>();
+
+        for (Stop s : getAllStops()) {
+            stopTotal.put(s.getStopId(), 0);
+            stopBreakdown.put(s.getStopId(), new ArrayList<>());
+            stopReqCount.put(s.getStopId(), 0);
+        }
+
+        for (DemandBatch b : getRankedWaitingBatches()) {
+            String p = b.getPickupStopId();
+            int current = stopTotal.getOrDefault(p, 0);
+            stopTotal.put(p, current + b.getPassengerCount());
+
+            List<String> list = stopBreakdown.computeIfAbsent(p, k -> new ArrayList<>());
+            list.add(b.getBatchId() + " (" + b.getPassengerCount() + " pax to " + b.getDestinationStopId() + ")");
+            stopReqCount.put(p, stopReqCount.getOrDefault(p, 0) + Math.max(1, b.getRequestQueue().size()));
+        }
+
+        List<StopCrowdSummary> result = new ArrayList<>();
+        for (Stop s : getAllStops()) {
+            result.add(new StopCrowdSummary(
+                    s.getStopId(),
+                    s.getStopName(),
+                    stopTotal.getOrDefault(s.getStopId(), 0),
+                    stopReqCount.getOrDefault(s.getStopId(), 0),
+                    stopBreakdown.getOrDefault(s.getStopId(), Collections.emptyList())
+            ));
+        }
+        return result;
+    }
+
     // Metric Calculations for SDG 9, 11, 13
     public record TransitMetrics(
             int totalPassengersWaiting,

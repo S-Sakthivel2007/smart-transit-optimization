@@ -35,7 +35,7 @@
                 <span class="quick-login-label">Select Demo Profile to Enter:</span>
                 <div class="quick-login-grid">
                     <div class="quick-user-card" onclick="quickLogin('supervisor', 'admin123')">
-                        <div class="quick-avatar avatar-sup">👨‍💼</div>
+                        <div class="quick-avatar avatar-sup">ðŸ‘¨â€ðŸ’¼</div>
                         <div class="quick-user-info">
                             <strong>Transit Supervisor</strong>
                             <span class="role-pill pill-sup">SUPERVISOR</span>
@@ -45,7 +45,7 @@
                     </div>
 
                     <div class="quick-user-card" onclick="quickLogin('passenger1', 'pass123')">
-                        <div class="quick-avatar avatar-pass">🧑‍🦱</div>
+                        <div class="quick-avatar avatar-pass">ðŸ§‘â€ðŸ¦±</div>
                         <div class="quick-user-info">
                             <strong>Passenger Portal</strong>
                             <span class="role-pill pill-pass">PASSENGER</span>
@@ -68,7 +68,7 @@
                 </div>
                 <div class="form-group">
                     <label for="login-password">Password</label>
-                    <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+                    <input type="password" id="login-password" class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required>
                 </div>
                 <div id="login-error-msg" class="login-error hidden"></div>
                 <button type="submit" class="btn btn-primary btn-block">Sign In</button>
@@ -100,7 +100,7 @@
 
             <!-- User Profile Summary in Sidebar -->
             <div class="user-profile-widget">
-                <div class="user-avatar" id="sidebar-user-avatar">👨‍💼</div>
+                <div class="user-avatar" id="sidebar-user-avatar">ðŸ‘¨â€ðŸ’¼</div>
                 <div class="user-meta">
                     <span class="user-name" id="sidebar-user-name">Chief Supervisor</span>
                     <span class="user-role-badge" id="sidebar-user-role">SUPERVISOR</span>
@@ -170,15 +170,6 @@
                     <span>Relief Trip History</span>
                 </button>
 
-                <button class="nav-item" data-page="database" onclick="navigateToPage('database')">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-                    </svg>
-                    <span>Database Explorer (SQLite)</span>
-                </button>
-
                 <button class="nav-item" data-page="sdg" onclick="navigateToPage('sdg')">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A7.002 7.002 0 0 1 5.07 11H5a1 1 0 0 1 0-2h.07A7.002 7.002 0 0 1 11 5.07V5a1 1 0 0 1 2 0v.07A7.002 7.002 0 0 1 18.93 11H19a1 1 0 0 1 0 2h-.07A7.002 7.002 0 0 1 13 16.93z"></path>
@@ -191,7 +182,7 @@
             <div class="sidebar-footer">
                 <div class="db-indicator">
                     <span class="db-indicator-dot"></span>
-                    <span id="side-db-status">SQLite: Connected</span>
+                    <span id="side-db-status">Transit DB: Active</span>
                 </div>
                 <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Theme">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -229,7 +220,7 @@
                         </div>
                         <div class="stat-chip">
                             <span class="stat-dot dot-emerald"></span>
-                            <span>CO₂ Saved: <strong id="top-stat-co2">0 kg</strong></span>
+                            <span>COâ‚‚ Saved: <strong id="top-stat-co2">0 kg</strong></span>
                         </div>
                     </div>
                 </div>
@@ -478,7 +469,7 @@
                                     </div>
 
                                     <div class="callout callout-info">
-                                        <div class="callout-icon">💡</div>
+                                        <div class="callout-icon">ðŸ’¡</div>
                                         <div class="callout-content">
                                             <strong>Corridor Demand Aggregation (ArrayDeque + PriorityQueue):</strong>
                                             <p>When multiple passengers book the same route, your counts are consolidated into a single priority batch for the supervisor.</p>
@@ -545,58 +536,6 @@
                     </div>
                 </section>
 
-                <!-- ============================================================== -->
-                <!-- PAGE 7: DATABASE EXPLORER (SQLite) -->
-                <!-- ============================================================== -->
-                <section id="page-database" class="page-view">
-                    <!-- DB Overview Cards -->
-                    <div class="db-overview-grid">
-                        <div class="card glass-card">
-                            <div class="card-body">
-                                <div class="kpi-label">Database Engine</div>
-                                <div class="kpi-value highlight-cyan" id="db-engine-val">SQLite 3 (ACID)</div>
-                                <div class="kpi-caption" id="db-driver-val">JDBC: org.sqlite.JDBC</div>
-                            </div>
-                        </div>
-                        <div class="card glass-card">
-                            <div class="card-body">
-                                <div class="kpi-label">Storage File</div>
-                                <div class="kpi-value highlight-emerald" id="db-filename-val">vetrinagar_transit.db</div>
-                                <div class="kpi-caption" id="db-filesize-val">Size: 64.00 KB</div>
-                            </div>
-                        </div>
-                        <div class="card glass-card">
-                            <div class="card-body">
-                                <div class="kpi-label">Connection Health</div>
-                                <div class="kpi-value highlight-emerald" id="db-status-val">ONLINE & CONNECTED</div>
-                                <div class="kpi-caption">Zero-latency embedded storage</div>
-                            </div>
-                        </div>
-                        <div class="card glass-card">
-                            <div class="card-body">
-                                <div class="kpi-label">Schema Coverage</div>
-                                <div class="kpi-value highlight-indigo" id="db-tables-val">8 Relational Tables</div>
-                                <div class="kpi-caption">Normalized transit entities</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Table Selector Toolbar -->
-                    <div class="card mt-4">
-                        <div class="card-header">
-                            <h2>Relational Database Tables Explorer</h2>
-                            <div class="table-switch-toolbar" id="table-buttons-toolbar"></div>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="data-table" id="db-data-table">
-                                    <thead id="db-table-head"></thead>
-                                    <tbody id="db-table-body"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </section>
 
                 <!-- ============================================================== -->
                 <!-- PAGE 8: SDG SUSTAINABILITY IMPACT -->
@@ -626,8 +565,8 @@
                                 <h3>SDG 13: Climate Action & Emissions Reduction</h3>
                             </div>
                             <div class="sdg-card-body">
-                                <p>Shifting commuters from single-occupancy two-wheelers and cars onto consolidated relief buses avoids approximately <strong>0.45 kg CO₂</strong> per passenger-trip.</p>
-                                <div class="kpi-value highlight-emerald" id="sdg-co2-val" style="margin-top:0.8rem;">0.0 kg CO₂ Saved</div>
+                                <p>Shifting commuters from single-occupancy two-wheelers and cars onto consolidated relief buses avoids approximately <strong>0.45 kg COâ‚‚</strong> per passenger-trip.</p>
+                                <div class="kpi-value highlight-emerald" id="sdg-co2-val" style="margin-top:0.8rem;">0.0 kg COâ‚‚ Saved</div>
                             </div>
                         </div>
                     </div>
