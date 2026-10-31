@@ -226,7 +226,7 @@ public class DatabaseManager {
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO buses (bus_id, bus_type, capacity, current_location, status, passengers_onboard) VALUES (?, ?, ?, ?, ?, ?)")) {
                 Object[][] busesData = {
-                        {"B01", "MiniBus", 20, "D00", "AVAILABLE", 0},
+                        {"B01", "MiniBus", 30, "D00", "AVAILABLE", 0}, // 30-passenger relief capacity
                         {"B02", "StandardBus", 40, "D00", "AVAILABLE", 0},
                         {"B03", "StandardBus", 50, "D00", "AVAILABLE", 0},
                         {"B04", "MiniBus", 25, "D00", "BROKEN", 0} // Pre-set for breakdown test
@@ -681,6 +681,23 @@ public class DatabaseManager {
             return sb.toString();
         } catch (SQLException e) {
             return "{\"error\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}";
+        }
+    }
+
+    public void clearAllDemands() {
+        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("DELETE FROM demand_requests");
+            stmt.executeUpdate("DELETE FROM demand_batches");
+        } catch (SQLException e) {
+            System.err.println("[DB ERROR] clearAllDemands: " + e.getMessage());
+        }
+    }
+
+    public void clearAllTrips() {
+        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("DELETE FROM relief_trips");
+        } catch (SQLException e) {
+            System.err.println("[DB ERROR] clearAllTrips: " + e.getMessage());
         }
     }
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Vetrinagar Smart Public Transit Route Optimization
  * Full-Featured Frontend Controller with Sidebar Navigation,
  * Role-Based Authentication, Interactive Transit Map, and SQLite Explorer.
@@ -49,10 +49,10 @@ const DEFAULT_ROADS = [
 ];
 
 const DEFAULT_BUSES = [
-    { id: "B01", type: "MiniBus", capacity: 20, location: "D00", status: "AVAILABLE", load: 0 },
-    { id: "B02", type: "StandardBus", capacity: 40, location: "D00", status: "AVAILABLE", load: 0 },
-    { id: "B03", type: "StandardBus", capacity: 50, location: "D00", status: "AVAILABLE", load: 0 },
-    { id: "B04", type: "MiniBus", capacity: 25, location: "D00", status: "BROKEN", load: 0 }
+    { id: "B01", type: "MiniBus", capacity: 30, location: "D00", status: "AVAILABLE", load: 0, remaining: 30 },
+    { id: "B02", type: "StandardBus", capacity: 40, location: "D00", status: "AVAILABLE", load: 0, remaining: 40 },
+    { id: "B03", type: "StandardBus", capacity: 50, location: "D00", status: "AVAILABLE", load: 0, remaining: 50 },
+    { id: "B04", type: "MiniBus", capacity: 25, location: "D00", status: "BROKEN", load: 0, remaining: 25 }
 ];
 
 const DEFAULT_DEMAND = [
@@ -182,7 +182,7 @@ function updateUserSessionUI() {
 
     if (nameEl) nameEl.innerText = u.fullName || u.username;
     if (roleEl) roleEl.innerText = u.role;
-    if (avatarEl) avatarEl.innerText = (u.role === 'SUPERVISOR') ? '👨‍💼' : '🧑‍🦱';
+    if (avatarEl) avatarEl.innerText = (u.role === 'SUPERVISOR') ? 'ðŸ‘¨â€ðŸ’¼' : 'ðŸ§‘â€ðŸ¦±';
 
     // Show/hide supervisor-only items based on current role
     const supItems = document.querySelectorAll('.supervisor-only');
@@ -320,7 +320,7 @@ function renderTopHeaderStats() {
     if (sideBadge) sideBadge.innerText = state.rankedDemand.length;
 
     const sdgCo2 = document.getElementById('sdg-co2-val');
-    if (sdgCo2) sdgCo2.innerText = `${co2} kg CO₂ Avoided`;
+    if (sdgCo2) sdgCo2.innerText = `${co2} kg COâ‚‚ Avoided`;
 }
 
 // =========================================================================
@@ -401,7 +401,7 @@ function renderSVGMap() {
 
         // Visual icon emoji for major hubs
         let iconSymbol = s.id;
-        if (isDepot) iconSymbol = '★ D00';
+        if (isDepot) iconSymbol = 'â˜… D00';
 
         // Check consolidated waiting crowd at this stop
         const stopWaitingCount = state.rankedDemand
@@ -417,7 +417,7 @@ function renderSVGMap() {
                 ${stopWaitingCount > 0 ? `
                     <g class="crowd-pill" transform="translate(${s.x}, ${s.y - radius - 7})">
                         <rect x="-19" y="-11" width="38" height="14" rx="7" fill="#e11d48" stroke="#ffffff" stroke-width="1.2" />
-                        <text x="0" y="-0.5" fill="#ffffff" font-size="8" font-family="'JetBrains Mono', monospace" font-weight="800" text-anchor="middle">👥 ${stopWaitingCount}</text>
+                        <text x="0" y="-0.5" fill="#ffffff" font-size="8" font-family="'JetBrains Mono', monospace" font-weight="800" text-anchor="middle">ðŸ‘¥ ${stopWaitingCount}</text>
                     </g>
                 ` : ''}
             </g>
@@ -492,8 +492,8 @@ function renderStopDetailsCard(stopId) {
                 </div>
                 <div style="font-size:0.75rem; color:var(--emerald); margin-top:0.25rem;">
                     ${batches.length > 1 
-                        ? `⚡ Combined from ${batches.length} commuter bookings at this location` 
-                        : (batches.length === 1 ? `⚡ 1 Active Consolidated Batch` : `✓ No passengers currently waiting`)}
+                        ? `âš¡ Combined from ${batches.length} commuter bookings at this location` 
+                        : (batches.length === 1 ? `âš¡ 1 Active Consolidated Batch` : `âœ“ No passengers currently waiting`)}
                 </div>
                 ${batches.length > 0 ? `
                     <div style="margin-top:0.4rem; font-size:0.72rem; color:var(--text-secondary); border-top:1px dashed rgba(255,255,255,0.15); padding-top:0.35rem;">
@@ -546,7 +546,7 @@ async function runDijkstraTester() {
         } else {
             state.activeHighlightedPath = [];
             renderSVGMap();
-            box.innerHTML = `<span style="color:var(--rose);">⚠️ ${data.message || 'No feasible route connects these stops.'}</span>`;
+            box.innerHTML = `<span style="color:var(--rose);">âš ï¸ ${data.message || 'No feasible route connects these stops.'}</span>`;
         }
     } catch (e) {
         // Fallback to client-side Dijkstra
@@ -564,7 +564,7 @@ async function runDijkstraTester() {
         } else {
             state.activeHighlightedPath = [];
             renderSVGMap();
-            box.innerHTML = `<span style="color:var(--rose);">⚠️ ${local.message || 'No route connects these stops.'}</span>`;
+            box.innerHTML = `<span style="color:var(--rose);">âš ï¸ ${local.message || 'No route connects these stops.'}</span>`;
         }
     }
 }
@@ -756,6 +756,54 @@ async function allocateReliefBus() {
     }
 }
 
+async function clearReliefQueue() {
+    if (!confirm("Are you sure you want to clear all waiting demands from the relief queue?")) return;
+    try {
+        const res = await fetch('/api/supervisor/clear-queue', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message || 'Relief queue cleared!', 'success');
+    } catch (e) {
+        showToast('Relief queue cleared!', 'info');
+    }
+    state.rankedDemand = [];
+    state.allDemand = [];
+    state.lastSubmittedRequest = null;
+    renderTopHeaderStats();
+    renderSVGMap();
+    renderOperationsQueue();
+    renderStopDetailsCard(state.selectedStopId);
+    updatePassengerStatusCard();
+}
+
+async function resetAllTransit() {
+    if (!confirm("Reset all buses back to Central Depot (D00) with full capacity and clear all demand?")) return;
+    try {
+        const res = await fetch('/api/supervisor/reset-all', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message || 'System reset to clean slate!', 'success');
+    } catch (e) {
+        showToast('System reset to clean slate!', 'info');
+    }
+    state.rankedDemand = [];
+    state.allDemand = [];
+    state.trips = [];
+    state.buses.forEach(b => {
+        b.status = 'AVAILABLE';
+        b.location = 'D00';
+        b.load = 0;
+        b.remaining = b.capacity;
+    });
+    state.activeHighlightedPath = [];
+    state.lastSubmittedRequest = null;
+    renderTopHeaderStats();
+    renderSVGMap();
+    renderOperationsQueue();
+    renderFleetPage();
+    renderTripsPage();
+    renderStopDetailsCard(state.selectedStopId);
+    updatePassengerStatusCard();
+}
+
 // =========================================================================
 // 6. BUS FLEET MANAGEMENT
 // =========================================================================
@@ -788,8 +836,8 @@ function renderFleetPage() {
                     <div class="bus-capacity-fill" style="width:${loadPct}%;"></div>
                 </div>
                 <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted);">
-                    <span>Load: ${b.load} / ${b.capacity}</span>
-                    <span>Cap: ${b.capacity} seats</span>
+                    <span>Load: <strong>${b.load || 0}</strong> / ${b.capacity}</span>
+                    <span style="color:var(--emerald); font-weight:700;">Remaining: ${b.remaining !== undefined ? b.remaining : Math.max(0, b.capacity - (b.load || 0))} seats</span>
                 </div>
                 <div style="margin-top:0.9rem; display:flex; gap:0.45rem;">
                     ${b.status === 'BROKEN' ? `
@@ -849,10 +897,53 @@ function setCount(val) {
     input.value = Math.max(1, parseInt(input.value || 0) + val);
 }
 
+function updateLiveStopBusCapacity(pickupStopId) {
+    const banner = document.getElementById('passenger-live-capacity-details');
+    if (!banner) return;
+    if (!pickupStopId) {
+        banner.innerHTML = "Select a pickup stop above to inspect bus seat availability in real time.";
+        return;
+    }
+
+    const busesHere = state.buses.filter(b => b.location === pickupStopId && b.status !== 'BROKEN');
+    const allAvailable = state.buses.filter(b => b.status === 'AVAILABLE');
+    let targetBus = busesHere.length > 0 ? busesHere[0] : (allAvailable.length > 0 ? allAvailable[0] : null);
+
+    if (targetBus) {
+        const remaining = targetBus.remaining !== undefined ? targetBus.remaining : Math.max(0, targetBus.capacity - (targetBus.load || 0));
+        banner.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                <div>
+                    <strong style="color:var(--cyan); font-size:1.05rem;">Bus ${targetBus.id} (${targetBus.type})</strong> 
+                    <span class="badge ${targetBus.status === 'AVAILABLE' ? 'badge-available' : 'badge-on-trip'}">${targetBus.status}</span>
+                    <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
+                        Stationed At: <strong>${targetBus.location}</strong> | Max Capacity: <strong>${targetBus.capacity} seats</strong>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:1.15rem; font-weight:800; color:${remaining > 0 ? 'var(--emerald)' : 'var(--rose)'}; font-family:'JetBrains Mono';">
+                        ${remaining} Seats Remaining
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">
+                        ${targetBus.load || 0} Boarded / ${targetBus.capacity} Max Seats
+                    </div>
+                </div>
+            </div>
+            <div class="bus-capacity-bar" style="margin-top:0.5rem; height:7px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
+                <div class="bus-capacity-fill" style="width:${Math.min(100, ((targetBus.load || 0) / targetBus.capacity) * 100)}%; height:100%; background:var(--cyan); transition:width 0.4s ease;"></div>
+            </div>
+        `;
+    } else {
+        banner.innerHTML = `<span style="color:var(--rose);">âš ï¸ No operational relief buses currently available near this stop.</span>`;
+    }
+}
+
 async function updatePassengerRoutePreview() {
     const pickup = document.getElementById('pass-pickup').value;
     const dest = document.getElementById('pass-dest').value;
     const box = document.getElementById('passenger-route-estimate');
+
+    updateLiveStopBusCapacity(pickup);
 
     if (!pickup || !dest || pickup === dest) {
         box.innerHTML = `<div class="estimate-placeholder">Select distinct pickup and destination stops to view live shortest travel time.</div>`;
@@ -872,7 +963,7 @@ async function updatePassengerRoutePreview() {
                 </div>
             `;
         } else {
-            box.innerHTML = `<div style="color:var(--rose); font-size:0.82rem;">⚠️ No open road route connects ${pickup} and ${dest}.</div>`;
+            box.innerHTML = `<div style="color:var(--rose); font-size:0.82rem;">âš ï¸ No open road route connects ${pickup} and ${dest}.</div>`;
         }
     } catch (e) {
         console.error(e);
@@ -974,8 +1065,10 @@ function updatePassengerStatusCard() {
                     <span class="badge badge-available">${trip.status}</span>
                 </div>
                 <div style="margin-top:0.4rem; font-size:0.85rem;">
-                    <div>Assigned Vehicle: <strong>${trip.busId}</strong> (Cap: ${trip.cap} seats)</div>
-                    <div>Route: <strong>${r.pickup} &rarr; ${r.dest}</strong> (${r.count} pax)</div>
+                    <div>Assigned Vehicle: <strong>${trip.busId}</strong> (Max Capacity: <strong>${trip.cap} seats</strong>)</div>
+                    <div>Passengers Boarded: <strong style="color:var(--emerald);">${trip.pax} passengers</strong></div>
+                    <div>Dynamic Remaining Capacity: <strong style="color:var(--cyan);">${Math.max(0, trip.cap - trip.pax)} seats available</strong></div>
+                    <div>Route: <strong>${r.pickup} &rarr; ${r.dest}</strong></div>
                     <div>Estimated Trip Duration: <strong style="color:var(--cyan);">${trip.totalTime} mins</strong></div>
                     <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.3rem;">Batch ID: ${r.batchId} | Ticket ID: ${r.requestId}</div>
                 </div>

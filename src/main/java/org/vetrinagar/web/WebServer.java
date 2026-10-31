@@ -73,6 +73,8 @@ public class WebServer {
         server.createContext("/api/supervisor/breakdown", new BreakdownHandler());
         server.createContext("/api/supervisor/repair", new RepairBusHandler());
         server.createContext("/api/supervisor/dijkstra", new DijkstraQueryHandler());
+        server.createContext("/api/supervisor/clear-queue", new ClearQueueHandler());
+        server.createContext("/api/supervisor/reset-all", new ResetAllHandler());
         server.createContext("/api/login", new LoginHandler());
         server.createContext("/api/database", new DatabaseOverviewHandler());
         server.createContext("/api/database/table", new TableRowsHandler());
@@ -192,8 +194,9 @@ public class WebServer {
             List<Bus> buses = service.getAllBuses();
             for (int i = 0; i < buses.size(); i++) {
                 Bus b = buses.get(i);
-                sb.append(String.format("{\"id\":\"%s\",\"type\":\"%s\",\"capacity\":%d,\"location\":\"%s\",\"status\":\"%s\",\"load\":%d,\"tripId\":%s}",
-                        escapeJson(b.getBusId()), escapeJson(b.getBusType()), b.getCapacity(),
+                int remaining = Math.max(0, b.getCapacity() - b.getPassengersOnboard());
+                sb.append(String.format("{\"id\":\"%s\",\"type\":\"%s\",\"capacity\":%d,\"remaining\":%d,\"location\":\"%s\",\"status\":\"%s\",\"load\":%d,\"tripId\":%s}",
+                        escapeJson(b.getBusId()), escapeJson(b.getBusType()), b.getCapacity(), remaining,
                         escapeJson(b.getCurrentLocation()), b.getStatus().name(), b.getPassengersOnboard(),
                         b.getCurrentTripId() != null ? "\"" + escapeJson(b.getCurrentTripId()) + "\"" : "null"));
                 if (i < buses.size() - 1) sb.append(",");
@@ -438,6 +441,30 @@ public class WebServer {
             String resp = String.format("{\"reachable\":%b,\"time\":%d,\"path\":%s,\"message\":\"%s\"}",
                     r.isReachable(), r.getTotalTravelTime(), pathJson, escapeJson(r.getErrorMessage()));
             sendJsonResponse(exchange, 200, resp);
+        }
+    }
+
+    private class ClearQueueHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 204, "");
+                return;
+            }
+            service.clearReliefQueue();
+            sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Relief queue cleared successfully.\"}");
+        }
+    }
+
+    private class ResetAllHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 204, "");
+                return;
+            }
+            service.resetAllTransitState();
+            sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"All queues cleared and buses reset to Central Depot (D00) with full capacity.\"}");
         }
     }
 

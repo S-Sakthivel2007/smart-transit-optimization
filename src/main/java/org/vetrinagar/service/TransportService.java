@@ -84,6 +84,10 @@ public class TransportService {
         // 3. Load Buses
         List<Bus> buses = dbManager.loadAllBuses();
         for (Bus b : buses) {
+            if ("B01".equals(b.getBusId()) && b.getCapacity() != 30) {
+                b = new MiniBus("B01", 30, b.getCurrentLocation(), b.getStatus());
+                dbManager.updateBus(b);
+            }
             busMap.put(b.getBusId(), b);
         }
 
@@ -160,7 +164,7 @@ public class TransportService {
                     newBatchId,
                     pickupStopId,
                     destinationStopId,
-                    passengerCount,
+                    0,
                     System.currentTimeMillis(),
                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                     "Passenger app surge (" + passengerName + ")",
@@ -229,9 +233,24 @@ public class TransportService {
             if (totalTime < minTotalTime) {
                 isBetter = true;
             } else if (totalTime == minTotalTime && bestBus != null) {
-                // Tie-breaker: choose bus with higher capacity to maximize crowd relief
-                if (bus.getCapacity() > bestBus.getCapacity()) {
+                // Smart fleet optimization (SDG 9 & 13):
+                // If multiple buses have identical transit time, select the best capacity fit for the demand.
+                int demand = batch.getPassengerCount();
+                boolean busFits = bus.getCapacity() >= demand;
+                boolean bestBusFits = bestBus.getCapacity() >= demand;
+
+                if (busFits && bestBusFits) {
+                    // Both cover demand: pick the smaller bus (e.g. 30 seats vs 50 seats) to avoid wasted capacity
+                    if (bus.getCapacity() < bestBus.getCapacity()) {
+                        isBetter = true;
+                    }
+                } else if (busFits && !bestBusFits) {
                     isBetter = true;
+                } else if (!busFits && !bestBusFits) {
+                    // Neither can cover full demand: pick higher capacity to board as many as possible
+                    if (bus.getCapacity() > bestBus.getCapacity()) {
+                        isBetter = true;
+                    }
                 }
             }
 
@@ -545,6 +564,38 @@ public class TransportService {
         this.waitingDemandQueue.clear();
         PriorityQueue<DemandBatch> newQueue = new PriorityQueue<>(policy.getComparator());
         newQueue.addAll(active);
+        this.waitingDemandQueue.addAll(newQueue);
+    }
+
+    /**
+     * Clears all waiting demands from PriorityQueue, batchMap, and database.
+     * Allows the supervisor to clear the relief queue and start fresh.
+     */
+    public synchronized void clearReliefQueue() {
+        this.waitingDemandQueue.clear();
+        this.batchMap.clear();
+        this.corridorToBatchMap.clear();
+        this.requestMap.clear();
+        this.dbManager.clearAllDemands();
+    }
+
+    /**
+     * Resets the entire transit simulation:
+     * - Clears relief queue and trip logs
+     * - Releases all buses back to Central Depot (D00) with status AVAILABLE,
+     *   clearing passenger load so full capacity (e.g. 30 seats) is restored.
+     */
+    public synchronized void resetAllTransitState() {
+        clearReliefQueue();
+        this.tripMap.clear();
+        this.dbManager.clearAllTrips();
+
+        for (Bus b : busMap.values()) {
+            b.releaseBus();
+            b.setCurrentLocation("D00");
+            b.setStatus("B04".equals(b.getBusId()) ? BusStatus.BROKEN : BusStatus.AVAILABLE);
+            dbManager.updateBus(b);
+        }
     }
 
     public User authenticate(String username, String password) {
