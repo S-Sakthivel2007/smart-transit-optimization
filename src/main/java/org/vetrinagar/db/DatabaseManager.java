@@ -8,151 +8,220 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * Manages SQLite database persistence for Vetrinagar Public Transit.
- * Ensures all stops, roads, buses, passenger requests, relief trips, and traffic changes
- * are reliably stored and loaded.
+ * Manages dual-engine database persistence for Vetrinagar Public Transit.
+ * Primary: MySQL / MariaDB (connecting to phpMyAdmin at localhost:3306).
+ * Fallback: SQLite (vetrinagar_transit.db) if MySQL is unavailable.
+ * Supports full bidirectional synchronization so any edits in phpMyAdmin
+ * are instantly reflected on the website, and all website actions are
+ * immediately stored in MySQL.
  */
 public class DatabaseManager {
-    private final String dbPath;
-    private final String jdbcUrl;
+    private boolean isMySql = false;
+    private String dbName = "transport_optimization";
+    private String jdbcUrl;
+    private String dbUser = "root";
+    private String dbPassword = "";
+    private String sqliteDbPath = "vetrinagar_transit.db";
 
-    public DatabaseManager(String dbPath) {
-        this.dbPath = dbPath != null ? dbPath : "vetrinagar_transit.db";
-        this.jdbcUrl = "jdbc:sqlite:" + this.dbPath;
+    public DatabaseManager() {
+        initConnection();
         initDatabase();
     }
 
-    public DatabaseManager() {
-        this("vetrinagar_transit.db");
+    public DatabaseManager(String customDb) {
+        if (customDb != null && customDb.contains("mysql")) {
+            this.jdbcUrl = customDb;
+            this.isMySql = true;
+        } else {
+            this.sqliteDbPath = customDb != null ? customDb : "vetrinagar_transit.db";
+        }
+        initConnection();
+        initDatabase();
     }
 
-    private Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(jdbcUrl);
+    private void initConnection() {
+        // Attempt MySQL connection first (port 3306, default XAMPP credentials)
+        String mysqlHost = "localhost:3306";
+        this.dbName = "transport_optimization";
+        String mysqlUrl = "jdbc:mysql://" + mysqlHost + "/" + dbName + "?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true";
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            try (Connection testConn = DriverManager.getConnection(mysqlUrl, dbUser, dbPassword)) {
+                this.jdbcUrl = mysqlUrl;
+                this.isMySql = true;
+                System.out.println("================================================================================");
+                System.out.println("  >>> [DB SUCCESS] Connected Live to MySQL Database: '" + dbName + "'");
+                System.out.println("  >>> Live synchronization with phpMyAdmin is ACTIVE at port 3306!");
+                System.out.println("================================================================================");
+                return;
+            }
+        } catch (Throwable e) {
+            System.out.println("[DB NOTICE] MySQL connection to '" + dbName + "' not available: " + e.getMessage());
+            // Try fallback MySQL database name 'vetrinagar_transit'
+            try {
+                String altUrl = "jdbc:mysql://" + mysqlHost + "/vetrinagar_transit?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true";
+                try (Connection testConn2 = DriverManager.getConnection(altUrl, dbUser, dbPassword)) {
+                    this.dbName = "vetrinagar_transit";
+                    this.jdbcUrl = altUrl;
+                    this.isMySql = true;
+                    System.out.println("  >>> [DB SUCCESS] Connected Live to MySQL Database: 'vetrinagar_transit' (phpMyAdmin)");
+                    return;
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        // Fallback to SQLite
+        try {
+            Class.forName("org.sqlite.JDBC");
+            this.jdbcUrl = "jdbc:sqlite:" + sqliteDbPath;
+            this.isMySql = false;
+            System.out.println("  >>> [DB INFO] Running on SQLite fallback engine: " + sqliteDbPath);
+        } catch (ClassNotFoundException e) {
+            System.err.println("  >>> [DB WARNING] Neither MySQL nor SQLite driver could be loaded: " + e.getMessage());
+        }
+    }
+
+    public Connection getConnection() throws SQLException {
+        if (isMySql) {
+            return DriverManager.getConnection(jdbcUrl, dbUser, dbPassword);
+        } else {
+            return DriverManager.getConnection(jdbcUrl);
+        }
+    }
+
+    public boolean isMySql() {
+        return isMySql;
+    }
+
+    public String getDbName() {
+        return dbName;
+    }
+
+    public String getJdbcUrl() {
+        return jdbcUrl;
     }
 
     /**
      * Initializes schema and seeds baseline dataset if database is newly created.
      */
     public synchronized void initDatabase() {
-        try {
-            // Ensure SQLite driver is loaded
-            Class.forName("org.sqlite.JDBC");
-        } catch (ClassNotFoundException e) {
-            System.err.println("[DB WARNING] SQLite JDBC driver not on classpath. Running in in-memory simulation mode if driver missing: " + e.getMessage());
-        }
-
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-            // 1. Users Table
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    username TEXT PRIMARY KEY,
-                    password TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    full_name TEXT NOT NULL
-                );
-            """);
+            if (isMySql) {
+                // MySQL DDL
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS `users` (
+                        `username` VARCHAR(50) NOT NULL PRIMARY KEY,
+                        `password` VARCHAR(100) NOT NULL,
+                        `role` VARCHAR(20) NOT NULL,
+                        `full_name` VARCHAR(100) NOT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """);
 
-            // 2. Stops Table
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS stops (
-                    stop_id TEXT PRIMARY KEY,
-                    stop_name TEXT NOT NULL,
-                    stop_type TEXT NOT NULL DEFAULT 'STOP',
-                    location_desc TEXT,
-                    map_x INTEGER NOT NULL DEFAULT 100,
-                    map_y INTEGER NOT NULL DEFAULT 100
-                );
-            """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS `stops` (
+                        `stop_id` VARCHAR(10) NOT NULL PRIMARY KEY,
+                        `stop_name` VARCHAR(100) NOT NULL,
+                        `stop_type` VARCHAR(20) NOT NULL,
+                        `location_desc` VARCHAR(255) DEFAULT NULL,
+                        `map_x` INT NOT NULL,
+                        `map_y` INT NOT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """);
 
-            // 3. Roads Table
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS roads (
-                    road_id INTEGER PRIMARY KEY,
-                    from_stop_id TEXT NOT NULL,
-                    to_stop_id TEXT NOT NULL,
-                    travel_time INTEGER NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'OPEN',
-                    road_type TEXT NOT NULL DEFAULT 'TWO_WAY',
-                    weight_limit TEXT NOT NULL DEFAULT 'All'
-                );
-            """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS `roads` (
+                        `road_id` INT NOT NULL PRIMARY KEY,
+                        `from_stop_id` VARCHAR(10) NOT NULL,
+                        `to_stop_id` VARCHAR(10) NOT NULL,
+                        `travel_time` INT NOT NULL,
+                        `status` VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+                        `road_type` VARCHAR(20) NOT NULL DEFAULT 'TWO_WAY',
+                        `weight_limit` VARCHAR(50) DEFAULT 'All'
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """);
 
-            // 4. Buses Table
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS buses (
-                    bus_id TEXT PRIMARY KEY,
-                    bus_type TEXT NOT NULL,
-                    capacity INTEGER NOT NULL,
-                    current_location TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'AVAILABLE',
-                    passengers_onboard INTEGER NOT NULL DEFAULT 0,
-                    current_trip_id TEXT
-                );
-            """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS `buses` (
+                        `bus_id` VARCHAR(10) NOT NULL PRIMARY KEY,
+                        `bus_type` VARCHAR(50) NOT NULL,
+                        `capacity` INT NOT NULL,
+                        `current_location` VARCHAR(10) NOT NULL,
+                        `status` VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+                        `passengers_onboard` INT NOT NULL DEFAULT 0,
+                        `current_trip_id` VARCHAR(50) DEFAULT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """);
 
-            // 5. Demand Batches Table
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS demand_batches (
-                    batch_id TEXT PRIMARY KEY,
-                    pickup_stop_id TEXT NOT NULL,
-                    destination_stop_id TEXT NOT NULL,
-                    passenger_count INTEGER NOT NULL,
-                    original_count INTEGER NOT NULL,
-                    arrival_timestamp INTEGER NOT NULL,
-                    arrival_time_formatted TEXT NOT NULL,
-                    remarks TEXT,
-                    status TEXT NOT NULL DEFAULT 'WAITING'
-                );
-            """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS `demand_batches` (
+                        `batch_id` VARCHAR(50) NOT NULL PRIMARY KEY,
+                        `pickup_stop_id` VARCHAR(10) NOT NULL,
+                        `destination_stop_id` VARCHAR(10) NOT NULL,
+                        `passenger_count` INT NOT NULL,
+                        `original_count` INT NOT NULL,
+                        `arrival_timestamp` BIGINT NOT NULL,
+                        `arrival_time_formatted` VARCHAR(20) NOT NULL,
+                        `remarks` VARCHAR(255) DEFAULT NULL,
+                        `status` VARCHAR(30) NOT NULL DEFAULT 'WAITING'
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """);
 
-            // 6. Individual Demand Requests Table (FIFO Queue elements)
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS demand_requests (
-                    request_id TEXT PRIMARY KEY,
-                    passenger_id TEXT NOT NULL,
-                    passenger_name TEXT NOT NULL,
-                    pickup_stop_id TEXT NOT NULL,
-                    destination_stop_id TEXT NOT NULL,
-                    passenger_count INTEGER NOT NULL,
-                    original_count INTEGER NOT NULL,
-                    submitted_at TEXT NOT NULL,
-                    assigned_batch_id TEXT,
-                    status TEXT NOT NULL DEFAULT 'WAITING'
-                );
-            """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS `demand_requests` (
+                        `request_id` VARCHAR(50) NOT NULL PRIMARY KEY,
+                        `passenger_id` VARCHAR(50) NOT NULL,
+                        `passenger_name` VARCHAR(100) NOT NULL,
+                        `pickup_stop_id` VARCHAR(10) NOT NULL,
+                        `destination_stop_id` VARCHAR(10) NOT NULL,
+                        `passenger_count` INT NOT NULL,
+                        `created_at` VARCHAR(50) NOT NULL,
+                        `assigned_batch_id` VARCHAR(50) DEFAULT NULL,
+                        `status` VARCHAR(30) NOT NULL DEFAULT 'WAITING'
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """);
 
-            // 7. Relief Trips Table
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS relief_trips (
-                    trip_id TEXT PRIMARY KEY,
-                    batch_id TEXT NOT NULL,
-                    bus_id TEXT NOT NULL,
-                    pickup_stop_id TEXT NOT NULL,
-                    destination_stop_id TEXT NOT NULL,
-                    passengers_allocated INTEGER NOT NULL,
-                    bus_capacity INTEGER NOT NULL,
-                    segment1_path TEXT,
-                    segment1_time INTEGER NOT NULL,
-                    segment2_path TEXT,
-                    segment2_time INTEGER NOT NULL,
-                    total_travel_time INTEGER NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'PLANNED',
-                    created_at TEXT NOT NULL,
-                    completed_at TEXT
-                );
-            """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS `relief_trips` (
+                        `trip_id` VARCHAR(50) NOT NULL PRIMARY KEY,
+                        `batch_id` VARCHAR(50) NOT NULL,
+                        `bus_id` VARCHAR(10) NOT NULL,
+                        `pickup_stop_id` VARCHAR(10) NOT NULL,
+                        `destination_stop_id` VARCHAR(10) NOT NULL,
+                        `passengers_allocated` INT NOT NULL,
+                        `bus_capacity` INT NOT NULL,
+                        `segment1_path` TEXT,
+                        `segment1_time` INT NOT NULL,
+                        `segment2_path` TEXT,
+                        `segment2_time` INT NOT NULL,
+                        `total_travel_time` INT NOT NULL,
+                        `status` VARCHAR(30) NOT NULL DEFAULT 'PLANNED',
+                        `created_at` VARCHAR(50) NOT NULL,
+                        `completed_at` VARCHAR(50) DEFAULT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """);
 
-            // 8. Traffic Logs Table
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS traffic_logs (
-                    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    road_id INTEGER NOT NULL,
-                    old_time INTEGER NOT NULL,
-                    new_time INTEGER NOT NULL,
-                    reason TEXT,
-                    logged_at TEXT NOT NULL
-                );
-            """);
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS `traffic_logs` (
+                        `log_id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        `road_id` INT NOT NULL,
+                        `old_time` INT NOT NULL,
+                        `new_time` INT NOT NULL,
+                        `reason` VARCHAR(255) DEFAULT NULL,
+                        `logged_at` VARCHAR(50) NOT NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """);
+            } else {
+                // SQLite DDL
+                stmt.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT NOT NULL, role TEXT NOT NULL, full_name TEXT NOT NULL);");
+                stmt.execute("CREATE TABLE IF NOT EXISTS stops (stop_id TEXT PRIMARY KEY, stop_name TEXT NOT NULL, stop_type TEXT NOT NULL DEFAULT 'STOP', location_desc TEXT, map_x INTEGER NOT NULL DEFAULT 100, map_y INTEGER NOT NULL DEFAULT 100);");
+                stmt.execute("CREATE TABLE IF NOT EXISTS roads (road_id INTEGER PRIMARY KEY, from_stop_id TEXT NOT NULL, to_stop_id TEXT NOT NULL, travel_time INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN', road_type TEXT NOT NULL DEFAULT 'TWO_WAY', weight_limit TEXT NOT NULL DEFAULT 'All');");
+                stmt.execute("CREATE TABLE IF NOT EXISTS buses (bus_id TEXT PRIMARY KEY, bus_type TEXT NOT NULL, capacity INTEGER NOT NULL, current_location TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'AVAILABLE', passengers_onboard INTEGER NOT NULL DEFAULT 0, current_trip_id TEXT);");
+                stmt.execute("CREATE TABLE IF NOT EXISTS demand_batches (batch_id TEXT PRIMARY KEY, pickup_stop_id TEXT NOT NULL, destination_stop_id TEXT NOT NULL, passenger_count INTEGER NOT NULL, original_count INTEGER NOT NULL, arrival_timestamp INTEGER NOT NULL, arrival_time_formatted TEXT NOT NULL, remarks TEXT, status TEXT NOT NULL DEFAULT 'WAITING');");
+                stmt.execute("CREATE TABLE IF NOT EXISTS demand_requests (request_id TEXT PRIMARY KEY, passenger_id TEXT NOT NULL, passenger_name TEXT NOT NULL, pickup_stop_id TEXT NOT NULL, destination_stop_id TEXT NOT NULL, passenger_count INTEGER NOT NULL, created_at TEXT NOT NULL, assigned_batch_id TEXT, status TEXT NOT NULL DEFAULT 'WAITING');");
+                stmt.execute("CREATE TABLE IF NOT EXISTS relief_trips (trip_id TEXT PRIMARY KEY, batch_id TEXT NOT NULL, bus_id TEXT NOT NULL, pickup_stop_id TEXT NOT NULL, destination_stop_id TEXT NOT NULL, passengers_allocated INTEGER NOT NULL, bus_capacity INTEGER NOT NULL, segment1_path TEXT, segment1_time INTEGER NOT NULL, segment2_path TEXT, segment2_time INTEGER NOT NULL, total_travel_time INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'PLANNED', created_at TEXT NOT NULL, completed_at TEXT);");
+                stmt.execute("CREATE TABLE IF NOT EXISTS traffic_logs (log_id INTEGER PRIMARY KEY AUTOINCREMENT, road_id INTEGER NOT NULL, old_time INTEGER NOT NULL, new_time INTEGER NOT NULL, reason TEXT, logged_at TEXT NOT NULL);");
+            }
 
             // Seed initial data if stops table is empty
             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM stops");
@@ -170,24 +239,9 @@ public class DatabaseManager {
             // A. Seed Users
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO users (username, password, role, full_name) VALUES (?, ?, ?, ?)")) {
-                ps.setString(1, "supervisor");
-                ps.setString(2, "admin123");
-                ps.setString(3, "SUPERVISOR");
-                ps.setString(4, "Chief Transit Supervisor");
-                ps.addBatch();
-
-                ps.setString(1, "passenger1");
-                ps.setString(2, "pass123");
-                ps.setString(3, "PASSENGER");
-                ps.setString(4, "Kavitha Raman");
-                ps.addBatch();
-
-                ps.setString(1, "passenger2");
-                ps.setString(2, "pass123");
-                ps.setString(3, "PASSENGER");
-                ps.setString(4, "Senthil Kumar");
-                ps.addBatch();
-
+                ps.setString(1, "supervisor"); ps.setString(2, "admin123"); ps.setString(3, "SUPERVISOR"); ps.setString(4, "Chief Transit Supervisor"); ps.addBatch();
+                ps.setString(1, "passenger1"); ps.setString(2, "pass123"); ps.setString(3, "PASSENGER"); ps.setString(4, "Kavitha Raman"); ps.addBatch();
+                ps.setString(1, "passenger2"); ps.setString(2, "pass123"); ps.setString(3, "PASSENGER"); ps.setString(4, "Senthil Kumar"); ps.addBatch();
                 ps.executeBatch();
             }
 
@@ -209,7 +263,6 @@ public class DatabaseManager {
                         {"S11", "North Bypass", "STOP", "Northern Highway Interchange & Freight Junction", 520, 80},
                         {"S12", "South Terminal", "STOP", "Southern Peripheral Outpost (Isolated Outpost)", 700, 560}
                 };
-
                 for (Object[] row : stopsData) {
                     ps.setString(1, (String) row[0]);
                     ps.setString(2, (String) row[1]);
@@ -222,16 +275,15 @@ public class DatabaseManager {
                 ps.executeBatch();
             }
 
-            // C. Seed Buses (B01, B02, B03, B04)
+            // C. Seed Buses (B01 Cap 30, B02 Cap 40, B03 Cap 50, B04 Cap 25 Broken)
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO buses (bus_id, bus_type, capacity, current_location, status, passengers_onboard) VALUES (?, ?, ?, ?, ?, ?)")) {
                 Object[][] busesData = {
-                        {"B01", "MiniBus", 30, "D00", "AVAILABLE", 0}, // 30-passenger relief capacity
+                        {"B01", "MiniBus", 30, "D00", "AVAILABLE", 0},
                         {"B02", "StandardBus", 40, "D00", "AVAILABLE", 0},
                         {"B03", "StandardBus", 50, "D00", "AVAILABLE", 0},
-                        {"B04", "MiniBus", 25, "D00", "BROKEN", 0} // Pre-set for breakdown test
+                        {"B04", "MiniBus", 25, "D00", "BROKEN", 0}
                 };
-
                 for (Object[] row : busesData) {
                     ps.setString(1, (String) row[0]);
                     ps.setString(2, (String) row[1]);
@@ -248,33 +300,51 @@ public class DatabaseManager {
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO roads (road_id, from_stop_id, to_stop_id, travel_time, status, road_type, weight_limit) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
                 Object[][] roadsData = {
-                        {1, "D00", "S01", 8, "OPEN", "TWO_WAY", "All"},
-                        {2, "D00", "S03", 10, "OPEN", "TWO_WAY", "All"},
-                        {3, "D00", "S04", 12, "OPEN", "TWO_WAY", "All"},
-                        {4, "D00", "S07", 9, "OPEN", "TWO_WAY", "All"},
-                        {5, "S01", "S02", 35, "OPEN", "TWO_WAY", "All"}, // Traffic-heavy corridor
-                        {6, "S01", "S03", 7, "OPEN", "TWO_WAY", "All"},
-                        {7, "S01", "S11", 11, "OPEN", "TWO_WAY", "All"},
-                        {8, "S11", "S02", 14, "OPEN", "TWO_WAY", "All"},
-                        {9, "S02", "S07", 12, "OPEN", "TWO_WAY", "All"},
-                        {10, "S02", "S08", 16, "OPEN", "TWO_WAY", "All"},
-                        {11, "S03", "S06", 15, "CLOSED", "TWO_WAY", "All"}, // Pipeline repair closure
-                        {12, "S03", "S04", 9, "OPEN", "TWO_WAY", "All"},
-                        {13, "S03", "S05", 13, "OPEN", "ONE_WAY", "All"}, // One-way downhill lane
-                        {14, "S04", "S05", 11, "OPEN", "TWO_WAY", "All"},
-                        {15, "S04", "S07", 15, "OPEN", "TWO_WAY", "All"},
-                        {16, "S04", "S10", 13, "OPEN", "TWO_WAY", "All"},
-                        {17, "S05", "S06", 10, "OPEN", "TWO_WAY", "All"},
-                        {18, "S05", "S09", 15, "OPEN", "TWO_WAY", "All"},
-                        {19, "S06", "S07", 14, "OPEN", "TWO_WAY", "All"},
-                        {20, "S06", "S10", 8, "OPEN", "TWO_WAY", "MiniBus Only"}, // Narrow historic bridge
-                        {21, "S07", "S08", 10, "OPEN", "TWO_WAY", "All"},
-                        {22, "S07", "S10", 16, "OPEN", "TWO_WAY", "All"},
-                        {23, "S08", "S11", 20, "OPEN", "TWO_WAY", "All"},
-                        {24, "S09", "S10", 12, "OPEN", "TWO_WAY", "All"},
-                        {25, "S10", "S12", 24, "CLOSED", "TWO_WAY", "All"} // Disconnected outpost
+                        {1, "D00", "S01", 10, "OPEN", "TWO_WAY", "All"},
+                        {2, "S01", "D00", 10, "OPEN", "TWO_WAY", "All"},
+                        {3, "D00", "S02", 15, "OPEN", "TWO_WAY", "All"},
+                        {4, "S02", "D00", 15, "OPEN", "TWO_WAY", "All"},
+                        {5, "S01", "S02", 20, "OPEN", "TWO_WAY", "All"},
+                        {6, "S02", "S01", 20, "OPEN", "TWO_WAY", "All"},
+                        {7, "S01", "S03", 12, "OPEN", "TWO_WAY", "All"},
+                        {8, "S03", "S01", 12, "OPEN", "TWO_WAY", "All"},
+                        {9, "S01", "S04", 15, "OPEN", "TWO_WAY", "All"},
+                        {10, "S04", "S01", 15, "OPEN", "TWO_WAY", "All"},
+                        {11, "D00", "S04", 8, "OPEN", "TWO_WAY", "All"},
+                        {12, "S04", "D00", 8, "OPEN", "TWO_WAY", "All"},
+                        {13, "S03", "S05", 14, "OPEN", "TWO_WAY", "All"},
+                        {14, "S05", "S03", 14, "OPEN", "TWO_WAY", "All"},
+                        {15, "S04", "S06", 10, "OPEN", "TWO_WAY", "All"},
+                        {16, "S06", "S04", 10, "OPEN", "TWO_WAY", "All"},
+                        {17, "S05", "S06", 12, "OPEN", "TWO_WAY", "All"},
+                        {18, "S06", "S05", 12, "OPEN", "TWO_WAY", "All"},
+                        {19, "D00", "S07", 12, "OPEN", "TWO_WAY", "All"},
+                        {20, "S07", "D00", 12, "OPEN", "TWO_WAY", "All"},
+                        {21, "S02", "S07", 14, "OPEN", "TWO_WAY", "All"},
+                        {22, "S07", "S02", 14, "OPEN", "TWO_WAY", "All"},
+                        {23, "S02", "S08", 16, "OPEN", "TWO_WAY", "All"},
+                        {24, "S08", "S02", 16, "OPEN", "TWO_WAY", "All"},
+                        {25, "S07", "S08", 10, "OPEN", "TWO_WAY", "All"},
+                        {26, "S08", "S07", 10, "OPEN", "TWO_WAY", "All"},
+                        {27, "S04", "S07", 18, "OPEN", "TWO_WAY", "All"},
+                        {28, "S07", "S04", 18, "OPEN", "TWO_WAY", "All"},
+                        {29, "S05", "S09", 15, "OPEN", "TWO_WAY", "All"},
+                        {30, "S09", "S05", 15, "OPEN", "TWO_WAY", "All"},
+                        {31, "S06", "S09", 16, "OPEN", "TWO_WAY", "All"},
+                        {32, "S09", "S06", 16, "OPEN", "TWO_WAY", "All"},
+                        {33, "S06", "S10", 14, "OPEN", "TWO_WAY", "All"},
+                        {34, "S10", "S06", 14, "OPEN", "TWO_WAY", "All"},
+                        {35, "S07", "S10", 15, "OPEN", "TWO_WAY", "All"},
+                        {36, "S10", "S07", 15, "OPEN", "TWO_WAY", "All"},
+                        {37, "S08", "S10", 22, "OPEN", "TWO_WAY", "All"},
+                        {38, "S10", "S08", 22, "OPEN", "TWO_WAY", "All"},
+                        {39, "S01", "S11", 14, "OPEN", "TWO_WAY", "All"},
+                        {40, "S11", "S01", 14, "OPEN", "TWO_WAY", "All"},
+                        {41, "S02", "S11", 12, "OPEN", "TWO_WAY", "All"},
+                        {42, "S11", "S02", 12, "OPEN", "TWO_WAY", "All"},
+                        {43, "D00", "S11", 16, "OPEN", "TWO_WAY", "All"},
+                        {44, "S11", "D00", 16, "OPEN", "TWO_WAY", "All"}
                 };
-
                 for (Object[] row : roadsData) {
                     ps.setInt(1, (Integer) row[0]);
                     ps.setString(2, (String) row[1]);
@@ -288,51 +358,8 @@ public class DatabaseManager {
                 ps.executeBatch();
             }
 
-            // E. Seed 22 Sample Demand Batches (Requirement: at least 20 demand batches)
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO demand_batches (batch_id, pickup_stop_id, destination_stop_id, passenger_count, original_count, arrival_timestamp, arrival_time_formatted, remarks, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-                Object[][] batchesData = {
-                        {"DEM-1001", "S01", "S02", 65, 65, 1700000001000L, "08:15:00", "IT shift morning peak surge", "WAITING"},
-                        {"DEM-1002", "S03", "S02", 45, 45, 1700000002000L, "08:20:00", "Intercity train arrived at junction", "WAITING"},
-                        {"DEM-1003", "S05", "S02", 40, 40, 1700000003000L, "08:22:00", "Student & staff tech cluster", "WAITING"},
-                        {"DEM-1004", "S04", "S01", 35, 35, 1700000004000L, "08:25:00", "Market shoppers batch", "WAITING"},
-                        {"DEM-1005", "S01", "S07", 30, 30, 1700000005000L, "08:28:00", "Residential commute", "WAITING"},
-                        {"DEM-1006", "S03", "S06", 25, 25, 1700000006000L, "08:30:00", "Hospital shift visitors", "WAITING"},
-                        {"DEM-1007", "S02", "S08", 20, 20, 1700000007000L, "08:32:00", "Industrial delivery crews", "WAITING"},
-                        {"DEM-1008", "S06", "S01", 18, 18, 1700000008000L, "08:35:00", "Morning clinic returnees", "WAITING"},
-                        {"DEM-1009", "S07", "S02", 15, 15, 1700000009000L, "08:37:00", "Tech park contractors", "WAITING"},
-                        {"DEM-1010", "S05", "S03", 12, 12, 1700000010000L, "08:40:00", "College rail commuters", "WAITING"},
-                        {"DEM-1011", "S01", "S08", 55, 55, 1700000011000L, "08:42:00", "Factory workers morning shift", "WAITING"},
-                        {"DEM-1012", "S03", "S05", 40, 40, 1700000002500L, "08:18:00", "University exam batch", "WAITING"},
-                        {"DEM-1013", "S04", "S07", 22, 22, 1700000013000L, "08:45:00", "Township residents", "WAITING"},
-                        {"DEM-1014", "S08", "S01", 38, 38, 1700000014000L, "08:48:00", "Wholesale market buyers", "WAITING"},
-                        {"DEM-1015", "S09", "S02", 14, 14, 1700000015000L, "08:50:00", "Lake view outer ring surge", "WAITING"},
-                        {"DEM-1016", "S10", "S03", 28, 28, 1700000016000L, "08:52:00", "Pilgrims heading to railway station", "WAITING"},
-                        {"DEM-1017", "S02", "S06", 16, 16, 1700000017000L, "08:55:00", "Medical supply staff", "WAITING"},
-                        {"DEM-1018", "S05", "S07", 48, 48, 1700000018000L, "08:58:00", "College group trip", "WAITING"},
-                        {"DEM-1019", "S01", "S10", 32, 32, 1700000019000L, "09:00:00", "Heritage bazaar visitors", "WAITING"},
-                        {"DEM-1020", "S10", "S12", 20, 20, 1700000020000L, "09:02:00", "South terminal connection (Disconnected link)", "WAITING"},
-                        {"DEM-1021", "S03", "S01", 15, 35, 1700000000500L, "08:00:00", "Partial trip serviced earlier", "PARTIALLY_ALLOCATED"},
-                        {"DEM-1022", "S02", "S03", 0,  20, 1700000000100L, "07:45:00", "Early morning shuttle completed", "COMPLETED"}
-                };
-
-                for (Object[] row : batchesData) {
-                    ps.setString(1, (String) row[0]);
-                    ps.setString(2, (String) row[1]);
-                    ps.setString(3, (String) row[2]);
-                    ps.setInt(4, (Integer) row[3]);
-                    ps.setInt(5, (Integer) row[4]);
-                    ps.setLong(6, (Long) row[5]);
-                    ps.setString(7, (String) row[6]);
-                    ps.setString(8, (String) row[7]);
-                    ps.setString(9, (String) row[8]);
-                    ps.addBatch();
-                }
-                ps.executeBatch();
-            }
-
             conn.commit();
-            System.out.println("[DB SUCCESS] Database seeded successfully with Vetrinagar transit dataset.");
+            System.out.println("[DB SUCCESS] Database seeded successfully.");
         } catch (SQLException e) {
             conn.rollback();
             throw e;
@@ -438,6 +465,30 @@ public class DatabaseManager {
         return list;
     }
 
+    public List<DemandRequest> loadAllDemandRequests() {
+        List<DemandRequest> list = new ArrayList<>();
+        String sql = "SELECT request_id, passenger_id, passenger_name, pickup_stop_id, destination_stop_id, passenger_count, created_at, assigned_batch_id, status FROM demand_requests";
+        try (Connection conn = getConnection(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                DemandRequest req = new DemandRequest(
+                        rs.getString("request_id"),
+                        rs.getString("passenger_id"),
+                        rs.getString("passenger_name"),
+                        rs.getString("pickup_stop_id"),
+                        rs.getString("destination_stop_id"),
+                        rs.getInt("passenger_count"),
+                        null
+                );
+                req.setAssignedBatchId(rs.getString("assigned_batch_id"));
+                req.setStatus(DemandStatus.fromString(rs.getString("status")));
+                list.add(req);
+            }
+        } catch (SQLException e) {
+            System.err.println("[DB ERROR] loadAllDemandRequests: " + e.getMessage());
+        }
+        return list;
+    }
+
     public List<ReliefTrip> loadAllReliefTrips() {
         List<ReliefTrip> list = new ArrayList<>();
         String sql = "SELECT trip_id, batch_id, bus_id, pickup_stop_id, destination_stop_id, passengers_allocated, bus_capacity, segment1_path, segment1_time, segment2_path, segment2_time, status FROM relief_trips ORDER BY created_at DESC";
@@ -504,13 +555,14 @@ public class DatabaseManager {
     }
 
     public void updateBus(Bus bus) {
-        String sql = "UPDATE buses SET current_location = ?, status = ?, passengers_onboard = ?, current_trip_id = ? WHERE bus_id = ?";
+        String sql = "UPDATE buses SET capacity = ?, current_location = ?, status = ?, passengers_onboard = ?, current_trip_id = ? WHERE bus_id = ?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, bus.getCurrentLocation());
-            ps.setString(2, bus.getStatus().name());
-            ps.setInt(3, bus.getPassengersOnboard());
-            ps.setString(4, bus.getCurrentTripId());
-            ps.setString(5, bus.getBusId());
+            ps.setInt(1, bus.getCapacity());
+            ps.setString(2, bus.getCurrentLocation());
+            ps.setString(3, bus.getStatus().name());
+            ps.setInt(4, bus.getPassengersOnboard());
+            ps.setString(5, bus.getCurrentTripId());
+            ps.setString(6, bus.getBusId());
             ps.executeUpdate();
         } catch (SQLException e) {
             System.err.println("[DB ERROR] updateBus: " + e.getMessage());
@@ -518,15 +570,28 @@ public class DatabaseManager {
     }
 
     public void saveDemandBatch(DemandBatch batch) {
-        String sql = """
-            INSERT INTO demand_batches (batch_id, pickup_stop_id, destination_stop_id, passenger_count, original_count, arrival_timestamp, arrival_time_formatted, remarks, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(batch_id) DO UPDATE SET
-                passenger_count = excluded.passenger_count,
-                original_count = excluded.original_count,
-                status = excluded.status,
-                remarks = excluded.remarks;
-        """;
+        String sql;
+        if (isMySql) {
+            sql = """
+                INSERT INTO demand_batches (batch_id, pickup_stop_id, destination_stop_id, passenger_count, original_count, arrival_timestamp, arrival_time_formatted, remarks, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    passenger_count = VALUES(passenger_count),
+                    original_count = VALUES(original_count),
+                    status = VALUES(status),
+                    remarks = VALUES(remarks);
+            """;
+        } else {
+            sql = """
+                INSERT INTO demand_batches (batch_id, pickup_stop_id, destination_stop_id, passenger_count, original_count, arrival_timestamp, arrival_time_formatted, remarks, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(batch_id) DO UPDATE SET
+                    passenger_count = excluded.passenger_count,
+                    original_count = excluded.original_count,
+                    status = excluded.status,
+                    remarks = excluded.remarks;
+            """;
+        }
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, batch.getBatchId());
             ps.setString(2, batch.getPickupStopId());
@@ -544,14 +609,26 @@ public class DatabaseManager {
     }
 
     public void saveDemandRequest(DemandRequest req) {
-        String sql = """
-            INSERT INTO demand_requests (request_id, passenger_id, passenger_name, pickup_stop_id, destination_stop_id, passenger_count, original_count, submitted_at, assigned_batch_id, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(request_id) DO UPDATE SET
-                passenger_count = excluded.passenger_count,
-                status = excluded.status,
-                assigned_batch_id = excluded.assigned_batch_id;
-        """;
+        String sql;
+        if (isMySql) {
+            sql = """
+                INSERT INTO demand_requests (request_id, passenger_id, passenger_name, pickup_stop_id, destination_stop_id, passenger_count, created_at, assigned_batch_id, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    passenger_count = VALUES(passenger_count),
+                    status = VALUES(status),
+                    assigned_batch_id = VALUES(assigned_batch_id);
+            """;
+        } else {
+            sql = """
+                INSERT INTO demand_requests (request_id, passenger_id, passenger_name, pickup_stop_id, destination_stop_id, passenger_count, created_at, assigned_batch_id, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(request_id) DO UPDATE SET
+                    passenger_count = excluded.passenger_count,
+                    status = excluded.status,
+                    assigned_batch_id = excluded.assigned_batch_id;
+            """;
+        }
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, req.getRequestId());
             ps.setString(2, req.getPassengerId());
@@ -559,10 +636,9 @@ public class DatabaseManager {
             ps.setString(4, req.getPickupStopId());
             ps.setString(5, req.getDestinationStopId());
             ps.setInt(6, req.getPassengerCount());
-            ps.setInt(7, req.getOriginalCount());
-            ps.setString(8, req.getSubmittedAt().toString());
-            ps.setString(9, req.getAssignedBatchId());
-            ps.setString(10, req.getStatus().name());
+            ps.setString(7, req.getSubmittedAt() != null ? req.getSubmittedAt().toString() : LocalDateTime.now().toString());
+            ps.setString(8, req.getAssignedBatchId());
+            ps.setString(9, req.getStatus().name());
             ps.executeUpdate();
         } catch (SQLException e) {
             System.err.println("[DB ERROR] saveDemandRequest: " + e.getMessage());
@@ -570,15 +646,28 @@ public class DatabaseManager {
     }
 
     public void saveReliefTrip(ReliefTrip trip) {
-        String sql = """
-            INSERT INTO relief_trips (trip_id, batch_id, bus_id, pickup_stop_id, destination_stop_id, passengers_allocated, bus_capacity, segment1_path, segment1_time, segment2_path, segment2_time, total_travel_time, status, created_at, completed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(trip_id) DO UPDATE SET
-                bus_id = excluded.bus_id,
-                passengers_allocated = excluded.passengers_allocated,
-                status = excluded.status,
-                completed_at = excluded.completed_at;
-        """;
+        String sql;
+        if (isMySql) {
+            sql = """
+                INSERT INTO relief_trips (trip_id, batch_id, bus_id, pickup_stop_id, destination_stop_id, passengers_allocated, bus_capacity, segment1_path, segment1_time, segment2_path, segment2_time, total_travel_time, status, created_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    bus_id = VALUES(bus_id),
+                    passengers_allocated = VALUES(passengers_allocated),
+                    status = VALUES(status),
+                    completed_at = VALUES(completed_at);
+            """;
+        } else {
+            sql = """
+                INSERT INTO relief_trips (trip_id, batch_id, bus_id, pickup_stop_id, destination_stop_id, passengers_allocated, bus_capacity, segment1_path, segment1_time, segment2_path, segment2_time, total_travel_time, status, created_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(trip_id) DO UPDATE SET
+                    bus_id = excluded.bus_id,
+                    passengers_allocated = excluded.passengers_allocated,
+                    status = excluded.status,
+                    completed_at = excluded.completed_at;
+            """;
+        }
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, trip.getTripId());
             ps.setString(2, trip.getBatchId());
@@ -601,25 +690,45 @@ public class DatabaseManager {
         }
     }
 
-    public String getDbPath() {
-        return dbPath;
+    public void clearAllDemands() {
+        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("DELETE FROM demand_requests");
+            stmt.executeUpdate("DELETE FROM demand_batches");
+        } catch (SQLException e) {
+            System.err.println("[DB ERROR] clearAllDemands: " + e.getMessage());
+        }
     }
 
-    public String getJdbcUrl() {
-        return jdbcUrl;
+    public void clearAllTrips() {
+        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("DELETE FROM relief_trips");
+        } catch (SQLException e) {
+            System.err.println("[DB ERROR] clearAllTrips: " + e.getMessage());
+        }
+    }
+
+    public void logTrafficChange(int roadId, int oldTime, int newTime, String reason) {
+        String sql = "INSERT INTO traffic_logs (road_id, old_time, new_time, reason, logged_at) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, roadId);
+            ps.setInt(2, oldTime);
+            ps.setInt(3, newTime);
+            ps.setString(4, reason);
+            ps.setString(5, LocalDateTime.now().toString());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("[DB ERROR] logTrafficChange: " + e.getMessage());
+        }
     }
 
     public Map<String, Object> getDatabaseOverview() {
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("driver", "org.sqlite.JDBC");
+        map.put("driver", isMySql ? "com.mysql.cj.jdbc.Driver" : "org.sqlite.JDBC");
         map.put("url", jdbcUrl);
-        map.put("databaseType", "SQLite Relational Database");
+        map.put("databaseType", isMySql ? "MySQL / MariaDB (phpMyAdmin)" : "SQLite Local File");
+        map.put("databaseName", dbName);
         map.put("connected", true);
-
-        File f = new File(dbPath);
-        map.put("filePath", f.getAbsolutePath());
-        map.put("fileSizeBytes", f.exists() ? f.length() : 0);
-        map.put("fileSizeFormatted", String.format("%.2f KB", (f.exists() ? f.length() : 0) / 1024.0));
+        map.put("phpmyadminUrl", "http://localhost/phpmyadmin/index.php?route=/database/structure&db=" + dbName);
 
         Map<String, Integer> counts = new LinkedHashMap<>();
         String[] tables = {"stops", "roads", "buses", "demand_batches", "demand_requests", "relief_trips", "traffic_logs", "users"};
@@ -639,7 +748,6 @@ public class DatabaseManager {
     }
 
     public String getTableRowsJson(String tableName) {
-        // Sanitize table name against known tables
         List<String> validTables = Arrays.asList("stops", "roads", "buses", "demand_batches", "demand_requests", "relief_trips", "traffic_logs", "users");
         if (!validTables.contains(tableName.toLowerCase())) {
             return "{\"columns\":[],\"rows\":[]}";
@@ -681,37 +789,6 @@ public class DatabaseManager {
             return sb.toString();
         } catch (SQLException e) {
             return "{\"error\":\"" + e.getMessage().replace("\"", "\\\"") + "\"}";
-        }
-    }
-
-    public void clearAllDemands() {
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate("DELETE FROM demand_requests");
-            stmt.executeUpdate("DELETE FROM demand_batches");
-        } catch (SQLException e) {
-            System.err.println("[DB ERROR] clearAllDemands: " + e.getMessage());
-        }
-    }
-
-    public void clearAllTrips() {
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate("DELETE FROM relief_trips");
-        } catch (SQLException e) {
-            System.err.println("[DB ERROR] clearAllTrips: " + e.getMessage());
-        }
-    }
-
-    public void logTrafficChange(int roadId, int oldTime, int newTime, String reason) {
-        String sql = "INSERT INTO traffic_logs (road_id, old_time, new_time, reason, logged_at) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, roadId);
-            ps.setInt(2, oldTime);
-            ps.setInt(3, newTime);
-            ps.setString(4, reason);
-            ps.setString(5, LocalDateTime.now().toString());
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("[DB ERROR] logTrafficChange: " + e.getMessage());
         }
     }
 }

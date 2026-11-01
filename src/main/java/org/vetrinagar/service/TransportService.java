@@ -112,6 +112,88 @@ public class TransportService {
         }
     }
 
+    /**
+     * Synchronizes live transit state with the database (MySQL/phpMyAdmin).
+     * If any changes were made directly in phpMyAdmin (e.g. bus capacity, status, road times, stops, demands),
+     * this updates the in-memory maps, weighted graph, and priority queue immediately.
+     */
+    public synchronized void syncLiveDatabase() {
+        try {
+            // 1. Sync Buses from Database
+            List<Bus> dbBuses = dbManager.loadAllBuses();
+            Set<String> dbBusIds = new HashSet<>();
+            for (Bus dbBus : dbBuses) {
+                dbBusIds.add(dbBus.getBusId());
+                Bus current = busMap.get(dbBus.getBusId());
+                if (current == null) {
+                    busMap.put(dbBus.getBusId(), dbBus);
+                } else {
+                    current.setCurrentLocation(dbBus.getCurrentLocation());
+                    current.setStatus(dbBus.getStatus());
+                    current.setCurrentTripId(dbBus.getCurrentTripId());
+                    if (current.getCapacity() != dbBus.getCapacity() || current.getPassengersOnboard() != dbBus.getPassengersOnboard()) {
+                        busMap.put(dbBus.getBusId(), dbBus);
+                    }
+                }
+            }
+            busMap.keySet().removeIf(id -> !dbBusIds.contains(id));
+
+            // 2. Sync Roads from Database (traffic & status)
+            List<Road> dbRoads = dbManager.loadAllRoads();
+            for (Road dbRoad : dbRoads) {
+                roadNetwork.updateRoadTravelTime(dbRoad.getRoadId(), dbRoad.getTravelTime());
+                roadNetwork.updateRoadStatus(dbRoad.getRoadId(), dbRoad.getStatus());
+            }
+
+            // 3. Sync Stops from Database
+            List<Stop> dbStops = dbManager.loadAllStops();
+            for (Stop dbStop : dbStops) {
+                stopMap.put(dbStop.getStopId(), dbStop);
+                roadNetwork.addStop(dbStop);
+            }
+
+            // 4. Sync Demand Batches & Relief Trips
+            List<DemandBatch> dbBatches = dbManager.loadAllDemandBatches();
+            Set<String> dbBatchIds = new HashSet<>();
+            for (DemandBatch b : dbBatches) {
+                dbBatchIds.add(b.getBatchId());
+                DemandBatch mem = batchMap.get(b.getBatchId());
+                if (mem == null) {
+                    batchMap.put(b.getBatchId(), b);
+                    String corridorKey = b.getPickupStopId() + "->" + b.getDestinationStopId();
+                    corridorToBatchMap.put(corridorKey, b.getBatchId());
+                } else {
+                    mem.setStatus(b.getStatus());
+                    mem.setRemarks(b.getRemarks());
+                    if (mem.getPassengerCount() != b.getPassengerCount()) {
+                        batchMap.put(b.getBatchId(), b);
+                    }
+                }
+            }
+            batchMap.keySet().removeIf(id -> !dbBatchIds.contains(id));
+            corridorToBatchMap.values().removeIf(id -> !dbBatchIds.contains(id));
+
+            // Sync relief trips
+            List<ReliefTrip> dbTrips = dbManager.loadAllReliefTrips();
+            Set<String> dbTripIds = new HashSet<>();
+            for (ReliefTrip t : dbTrips) {
+                dbTripIds.add(t.getTripId());
+                tripMap.put(t.getTripId(), t);
+            }
+            tripMap.keySet().removeIf(id -> !dbTripIds.contains(id));
+
+            // Rebuild waiting demand queue
+            waitingDemandQueue.clear();
+            for (DemandBatch b : batchMap.values()) {
+                if ((b.getStatus() == DemandStatus.WAITING || b.getStatus() == DemandStatus.PARTIALLY_ALLOCATED) && b.getPassengerCount() > 0) {
+                    waitingDemandQueue.add(b);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[SYNC NOTICE] syncLiveDatabase error: " + e.getMessage());
+        }
+    }
+
     // =========================================================================
     // PASSENGER PORTAL & DEMAND AGGREGATION
     // =========================================================================

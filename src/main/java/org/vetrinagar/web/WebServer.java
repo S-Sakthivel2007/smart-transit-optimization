@@ -78,6 +78,10 @@ public class WebServer {
         server.createContext("/api/login", new LoginHandler());
         server.createContext("/api/database", new DatabaseOverviewHandler());
         server.createContext("/api/database/table", new TableRowsHandler());
+        server.createContext("/api/database/sync", exchange -> {
+            service.syncLiveDatabase();
+            sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Live synchronized with database (MySQL / phpMyAdmin)\"}");
+        });
 
         // Redirect /phpmyadmin on port 8080 to XAMPP Apache phpMyAdmin on port 80
         server.createContext("/phpmyadmin", exchange -> {
@@ -168,6 +172,9 @@ public class WebServer {
                 sendJsonResponse(exchange, 204, "");
                 return;
             }
+
+            // Sync with live database (MySQL/phpMyAdmin) on every poll
+            service.syncLiveDatabase();
 
             StringBuilder sb = new StringBuilder();
             sb.append("{");
@@ -271,6 +278,15 @@ public class WebServer {
                     m.totalPassengersWaiting(), m.totalPassengersServed(), m.activeReliefTrips(),
                     m.availableBuses(), m.totalFleetSize(), m.fleetUtilizationPercent(),
                     m.co2EmissionsSavedKg(), m.averageWaitTimeMinutes()));
+
+            // Database engine and phpMyAdmin connection details
+            var db = service.getDatabaseManager();
+            sb.append(",");
+            sb.append(String.format("\"database\":{\"engine\":\"%s\",\"name\":\"%s\",\"isMySql\":%b,\"phpmyadminUrl\":\"http://localhost/phpmyadmin/index.php?route=/database/structure&db=%s\"}",
+                    db.isMySql() ? "MySQL / MariaDB" : "SQLite",
+                    escapeJson(db.getDbName()),
+                    db.isMySql(),
+                    escapeJson(db.getDbName())));
 
             sb.append("}");
             sendJsonResponse(exchange, 200, sb.toString());

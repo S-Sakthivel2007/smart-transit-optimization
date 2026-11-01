@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -345,6 +345,18 @@
                             </svg>
                             Allocate Relief Bus to #1 Surge Batch
                         </button>
+                        <button class="btn btn-outline" onclick="syncWithDatabase()" title="Synchronize changes made in phpMyAdmin immediately">
+                            🔄 Sync with MySQL
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearReliefQueue()" title="Clear relief queue to start fresh">
+                            🗑️ Clear Relief Queue
+                        </button>
+                        <button class="btn btn-outline" onclick="resetAllTransit()" title="Reset fleet and clear demand">
+                            🔄 Reset Fleet & Queue
+                        </button>
+                        <a href="http://localhost/phpmyadmin/index.php?route=/database/structure&db=transport_optimization" target="_blank" class="btn btn-outline" style="text-decoration:none;" title="Open database in phpMyAdmin">
+                            🗄️ Open in phpMyAdmin ↗
+                        </a>
                         <div class="policy-pill">
                             Policy: <strong>Passenger Count (DESC)</strong> &rarr; <strong>Arrival Time (ASC)</strong>
                         </div>
