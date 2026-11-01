@@ -21,3 +21,7 @@ target/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Python virtual environment & temporary template extracts
+.venv/
+template_extracted/
