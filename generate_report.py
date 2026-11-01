@@ -418,20 +418,18 @@ def build_project_report():
         ("", "  2.3 DATABASE DESIGN AND RELATIONAL SCHEMA", "9"),
         ("", "  2.4 IMPLEMENTATION OF CORE MODULES", "9"),
         ("", "  2.5 COMPLETE WORKING DEMONSTRATION", "10"),
-        ("", "      2.5.1 Live Interactive SVG Transit Map & Supervisor Interface", "11"),
-        ("", "      2.5.2 phpMyAdmin Database Administration & Bidirectional Sync", "12"),
-        ("", "      2.5.3 Real-World Synchronization & Persistence Architecture", "13"),
-        ("3", "TESTING, RESULTS AND EVALUATION", "14"),
-        ("", "  3.1 TESTING AND VALIDATION METHODOLOGY", "14"),
-        ("", "      3.1.1 Defect Resolution & Bug Correction History", "15"),
-        ("", "  3.2 EMPIRICAL RESULTS AND PERFORMANCE ANALYSIS", "15"),
-        ("", "  3.3 SUSTAINABILITY, COST AND RESOURCE EFFICIENCY", "16"),
-        ("", "  3.4 SYSTEM LIMITATIONS AND FUTURE ENHANCEMENTS", "16"),
-        ("4", "GITHUB AND CONCLUSION", "17"),
-        ("", "  4.1 GITHUB REPOSITORY AND VERSION CONTROL", "17"),
-        ("", "  4.2 CONCLUSION", "18"),
-        ("", "REFERENCES", "19"),
-        ("", "APPENDIX (CODE)", "20")
+        ("", "      2.5.1 User Interface and Database Management Screenshots", "12"),
+        ("3", "TESTING, RESULTS AND EVALUATION", "13"),
+        ("", "  3.1 TESTING AND VALIDATION METHODOLOGY", "13"),
+        ("", "      3.1.1 Defect Resolution & Bug Correction History", "14"),
+        ("", "  3.2 EMPIRICAL RESULTS AND PERFORMANCE ANALYSIS", "14"),
+        ("", "  3.3 SUSTAINABILITY, COST AND RESOURCE EFFICIENCY", "15"),
+        ("", "  3.4 SYSTEM LIMITATIONS AND FUTURE ENHANCEMENTS", "15"),
+        ("4", "GITHUB AND CONCLUSION", "16"),
+        ("", "  4.1 GITHUB REPOSITORY AND VERSION CONTROL", "16"),
+        ("", "  4.2 CONCLUSION", "17"),
+        ("", "REFERENCES", "18"),
+        ("", "APPENDIX (CODE)", "19")
     ]
     
     toc_table = doc.add_table(rows=len(toc_data), cols=3)
@@ -579,14 +577,9 @@ def build_project_report():
     bullet_p("Abstraction: ", "Routing and demand management interfaces (such as Router and DemandPolicy) decouple algorithmic solvers from business models. This allows future plug-and-play substitutions of Dijkstra with A* or multi-criteria Pareto optimizers without modifying the core transit service orchestrator.")
 
     h2_sec("1.5", "DATA STRUCTURES AND ALGORITHM SELECTION")
-    body_p("Efficient algorithmic execution is paramount for real-time transit dispatching. The selection of data structures was driven by strict asymptotic performance criteria:")
+    body_p("Efficient algorithmic execution is paramount for real-time transit dispatching. The selection of core data structures and algorithmic routines was established based on computational complexity, memory footprint, and real-time execution guarantees. The algorithmic complexity analysis of all primary system operations is summarized in Table 1.4:")
 
-    bullet_p("Weighted Directed Graph (Adjacency List): ", "The municipal transit network is modeled as a WeightedGraph where vertices represent Stops and directed edges represent Roads. An adjacency list representation using HashMap<String, List<Road>> provides O(1) expected stop lookup and O(deg(V)) edge traversal, vastly outperforming an adjacency matrix in both memory efficiency and sparsity handling.")
-    bullet_p("PriorityQueue (Binary Max-Heap): ", "Maintains unallocated surge batches sorted by urgency. The custom Comparator orders batches first by passenger count descending (maximizing commuters served per dispatch) and second by arrival timestamp ascending (FIFO fairness for equal crowd sizes). Root extraction executes in O(log N) time.")
-    bullet_p("ArrayDeque (FIFO Sub-Queue): ", "Within each DemandBatch, individual PassengerRequest instances are queued in an ArrayDeque. When a relief bus boards a fraction of a large crowd, passengers are boarded in exact order of request timestamp, guaranteeing operational fairness.")
-    bullet_p("Dijkstra’s Shortest Path Algorithm: ", "Employs an indexed min-priority queue to explore paths with minimum cumulative travel time. For relief dispatches, Dijkstra is evaluated across two distinct stages: Stage 1 finds the fastest route from Central Depot (D00) to the designated pickup stop, and Stage 2 computes the optimal corridor from pickup stop to final destination. The overall routing complexity is O((V + E) log V).")
-
-    p_text("Table 1.4: Algorithmic Complexity Analysis of Core Operations", size=10.5, bold=True, space_before=8, space_after=3)
+    p_text("Table 1.4: Algorithmic Complexity Analysis of Core Operations", size=10.5, bold=True, space_before=6, space_after=3)
     algo_table = doc.add_table(rows=6, cols=4)
     algo_data = [
         ("System Operation", "Underlying Data Structure", "Time Complexity", "Space Complexity"),
@@ -756,9 +749,11 @@ while (!pq.isEmpty()) {
     bullet_p("Step 4: Two-Segment Route Dispatch: ", "Dijkstra computes Segment 1 (D00 to S01: 10 mins) and Segment 2 (S01 to S02: 20 mins). Total travel time is 30 mins. Bus B01 boards 25 passengers, dynamically reducing its available capacity from 30 to 5 seats.")
     bullet_p("Step 5: Database Persistence: ", "A new record is inserted into relief_trips (TRIP-101), bus B01 status is updated to ON_TRIP with 25 passengers onboard, and batch DEM-1001 status transitions to COMPLETED in MySQL, immediately viewable in phpMyAdmin.")
 
-    # Section 2.5.1: Live Interactive SVG Map Demonstration
-    h3_subsec("2.5.1", "Live Interactive SVG Transit Map & Supervisor Interface")
-    body_p("The live web interface provides municipal supervisors with an intuitive, real-time command dashboard. Figure 2.1 displays the active topological map during the morning peak transit period, showing glowing surge badges, active fleet allocations, and shortest path highlighting:")
+    body_p("The successful automated execution of this operational cycle confirms the end-to-end reliability of the transit dispatch pipeline. Commuter demand was aggregated seamlessly without thread contention, the PriorityQueue surfaced the highest-density cluster in sub-millisecond time, and the Dijkstra two-segment routing engine selected the optimal path avoiding congested corridors. Real-time vehicle capacity was deducted accurately and immediately synchronized with MySQL over JDBC, providing municipal dispatchers with complete situational awareness.")
+
+    # Section 2.5.1: User Interface and Database Management Evidence (Screenshots)
+    doc.add_page_break()
+    h3_subsec("2.5.1", "User Interface and Database Management Evidence (Screenshots)")
 
     if os.path.exists(map_img_path):
         p_img1 = doc.add_paragraph()
@@ -766,19 +761,8 @@ while (!pq.isEmpty()) {
         p_img1.paragraph_format.space_before = Pt(4)
         p_img1.paragraph_format.space_after = Pt(2)
         run_img1 = p_img1.add_run()
-        run_img1.add_picture(map_img_path, width=Inches(4.8))
-        p_text("Figure 2.1: Live Interactive SVG Transit Map & Fleet Supervisor Dashboard", size=10, italic=True, space_before=1, space_after=6, align=WD_ALIGN_PARAGRAPH.CENTER)
-
-    body_p("Key operational elements documented in Figure 2.1 demonstrate the following system capabilities:")
-    bullet_p("1. Topological Stop Nodes: ", "All 13 municipal transit halts are rendered as circular coordinate nodes with high-contrast label badges. Central Depot (D00) is prominently marked with a distinct fleet maintenance icon.")
-    bullet_p("2. Dynamic Commuter Surge Indicator: ", "A glowing badge displaying '👥 25' appears at node S01 (Market Junction), signaling that 25 passengers are awaiting transit to S02 (Tech Park).")
-    bullet_p("3. Real-Time Vehicle Status Sidebar: ", "The right-hand panel lists active fleet inventory, indicating that MiniBus B01 (Capacity 30) is currently allocated with 25 passengers onboard, while StandardBuses B02 and B03 remain on standby.")
-    bullet_p("4. Congestion-Aware Corridor Edges: ", "Road corridors connect nodes with bidirectional traffic flow. Green corridors signify normal transit velocity (<15 mins), amber represents narrow or caution zones, and red denotes heavy traffic bottlenecks.")
-    bullet_p("5. Vector Canvas Coordinate Geometry: ", "The entire network map is generated using mathematically normalized SVG vectors, enabling smooth browser zooming without pixelation on high-density municipal control screens.")
-
-    # Section 2.5.2: Live phpMyAdmin Database Administration
-    h3_subsec("2.5.2", "phpMyAdmin Database Administration & Bidirectional Sync")
-    body_p("All transactional events, fleet states, road edge conditions, and passenger queues are persistently stored in the MariaDB/MySQL engine and managed in real-time through phpMyAdmin. Figure 2.2 documents the production schema and live record counts of the transport_optimization database:")
+        run_img1.add_picture(map_img_path, width=Inches(4.6))
+        p_text("Figure 2.1: Live Interactive SVG Transit Map & Fleet Supervisor Dashboard", size=10, italic=True, space_before=1, space_after=10, align=WD_ALIGN_PARAGRAPH.CENTER)
 
     if os.path.exists(pma_img_path):
         p_img2 = doc.add_paragraph()
@@ -786,34 +770,8 @@ while (!pq.isEmpty()) {
         p_img2.paragraph_format.space_before = Pt(4)
         p_img2.paragraph_format.space_after = Pt(2)
         run_img2 = p_img2.add_run()
-        run_img2.add_picture(pma_img_path, width=Inches(4.8))
+        run_img2.add_picture(pma_img_path, width=Inches(4.6))
         p_text("Figure 2.2: Live phpMyAdmin Database Management Interface (transport_optimization)", size=10, italic=True, space_before=1, space_after=6, align=WD_ALIGN_PARAGRAPH.CENTER)
-
-    body_p("The live database administration interface shown in Figure 2.2 confirms the structural integrity and operational persistence of the transit network:")
-    bullet_p("1. Production Table Architecture: ", "The schema comprises five primary tables: buses (4 active fleet records), demand_requests (22 processed commuter bookings), relief_trips (2 authorized and tracked trips), roads (44 bidirectional graph edges), and stops (13 municipal stations).")
-    bullet_p("2. Enterprise InnoDB Engine: ", "All tables utilize the InnoDB storage engine configured with utf8mb4_unicode_ci character collation. This guarantees full ACID transactional compliance, row-level locking during simultaneous commuter bookings, and immediate foreign key constraint enforcement.")
-
-    # Section 2.5.3: Synchronization Architecture
-    h3_subsec("2.5.3", "Real-World Synchronization & Persistence Architecture")
-    body_p("To guarantee high reliability and avoid single-point failure bottlenecks between the relational database and the live transit routing engine, the synchronization architecture is governed by three fundamental principles:")
-    bullet_p("1. Decoupled Scheduled Polling Daemon: ", "A dedicated background thread in DatabaseManager queries MySQL every 3.0 seconds via SELECT MAX(updated_at). If changes are detected in roads or buses (e.g., road blockage declared by city police in phpMyAdmin), the in-memory graph edge weights are recalculated on-the-fly without restarting the Java server or dropping active browser connections.")
-    bullet_p("2. Transactional Integrity & Rollback Safeguards: ", "All passenger demand assignments and bus capacity deductions are wrapped in atomic SQL transactions (BEGIN TRANSACTION ... COMMIT). In the event of a simultaneous connection timeout, transactions roll back automatically, ensuring zero passenger double-counting or seat leakage.")
-    bullet_p("3. High-Performance In-Memory Read Cache: ", "While writes are committed synchronously to MySQL, high-frequency read requests from the web dashboard are served from thread-safe ConcurrentHashMap caches in Java memory, achieving sub-millisecond response times even under heavy concurrent commuter booking spikes.")
-
-    p_text("Table 2.3: Database Entities and In-Memory Domain Model Mapping", size=10.5, bold=True, space_before=6, space_after=3)
-    sync_table = doc.add_table(rows=6, cols=4)
-    sync_data = [
-        ("Database Table", "Java Domain Model", "Key State Fields Synchronized", "Sync Trigger & Propagation"),
-        ("stops", "Stop.java", "id, name, type, x, y", "Loaded on server boot; static transit halt coordinates."),
-        ("roads", "Road.java", "from_stop, to_stop, time, status", "Polled every 3.0s; updates graph edge weights dynamically."),
-        ("buses", "Bus.java", "capacity, passengers, status", "Updated immediately on dispatch; bidirectional sync via phpMyAdmin."),
-        ("demand_requests", "PassengerRequest.java", "name, count, pickup, drop, status", "Inserted via POST /api/demand; batched into PriorityQueue."),
-        ("relief_trips", "ReliefTrip (Record)", "trip_id, bus_id, batch_id, time", "Logged on dispatch; provides permanent municipal audit trail.")
-    ]
-    for r_i, row in enumerate(sync_table.rows):
-        for c_i, cell in enumerate(row.cells):
-            cell.text = sync_data[r_i][c_i]
-    style_table(sync_table, [Inches(1.2), Inches(1.5), Inches(2.2), Inches(1.6)])
 
     # =========================================================================
     # CHAPTER 3: TESTING, RESULTS AND EVALUATION
