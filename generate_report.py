@@ -46,7 +46,7 @@ def build_project_report():
     pma_img_path = r"C:\Users\sakth\.gemini\antigravity\scratch\smart-transit-optimization\report_screenshots\screenshot_phpmyadmin.png"
 
     # Helper functions with strict spacing and natural word flow
-    def p_text(text, size=12, bold=False, italic=False, space_after=5, space_before=0, line_spacing=1.15, align=WD_ALIGN_PARAGRAPH.LEFT, color=(0,0,0)):
+    def p_text(text, size=12, bold=False, italic=False, space_after=6, space_before=0, line_spacing=1.15, align=WD_ALIGN_PARAGRAPH.LEFT, color=(0,0,0)):
         p = doc.add_paragraph()
         p.alignment = align
         p.paragraph_format.space_before = Pt(space_before)
@@ -66,18 +66,19 @@ def build_project_report():
         p_text(title.upper(), size=15, bold=True, space_before=0, space_after=14, align=WD_ALIGN_PARAGRAPH.CENTER, color=(15, 23, 42))
 
     def h2_sec(sec_num, title):
-        p = p_text(f"{sec_num} {title}", size=13.5, bold=True, space_before=12, space_after=5, color=(24, 43, 73))
+        p = p_text(f"{sec_num} {title}", size=13.5, bold=True, space_before=14, space_after=6, color=(24, 43, 73))
         p.paragraph_format.keep_with_next = True
         return p
 
     def h3_subsec(subsec_num, title):
-        p = p_text(f"{subsec_num} {title}", size=12.5, bold=True, space_before=9, space_after=3, color=(45, 60, 80))
+        p = p_text(f"{subsec_num} {title}", size=12.5, bold=True, space_before=10, space_after=4, color=(45, 60, 80))
         p.paragraph_format.keep_with_next = True
         return p
 
-    def body_p(text, bold_prefix=None, space_after=5):
+    def body_p(text, bold_prefix=None, space_after=6):
         p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        # Using LEFT alignment guarantees 100% natural word spacing without justification stretching
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         p.paragraph_format.space_before = Pt(0)
         p.paragraph_format.space_after = Pt(space_after)
         p.paragraph_format.line_spacing = 1.15
@@ -93,11 +94,10 @@ def build_project_report():
         return p
 
     def bullet_p(bold_title, text):
-        # LEFT alignment ensures clean, uniform word spacing without justification stretching
         p = doc.add_paragraph(style='List Bullet')
         p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        p.paragraph_format.space_before = Pt(1.5)
-        p.paragraph_format.space_after = Pt(3.5)
+        p.paragraph_format.space_before = Pt(2)
+        p.paragraph_format.space_after = Pt(4)
         p.paragraph_format.line_spacing = 1.15
         title = bold_title if bold_title.endswith(" ") else bold_title + " "
         r_title = p.add_run(title)
@@ -109,11 +109,22 @@ def build_project_report():
         run.font.size = Pt(11.5)
         return p
 
+    def table_caption(title):
+        p = p_text(title, size=11, bold=True, space_before=14, space_after=6, color=(24, 43, 73))
+        p.paragraph_format.keep_with_next = True
+        return p
+
+    def table_spacer():
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(10)
+        return p
+
     def code_box(code_text):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         p.paragraph_format.space_before = Pt(4)
-        p.paragraph_format.space_after = Pt(7)
+        p.paragraph_format.space_after = Pt(8)
         p.paragraph_format.line_spacing = 1.05
         p.paragraph_format.left_indent = Inches(0.2)
         p.paragraph_format.right_indent = Inches(0.2)
@@ -170,13 +181,13 @@ def build_project_report():
                     shd = parse_xml(r'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="clear" w:color="auto" w:fill="F8FAFC"/>')
                     tcPr.append(shd)
 
-                # Cell padding
+                # Generous Cell Padding for Clean Visual Breathing Room
                 tcMar = parse_xml(r'''
                     <w:tcMar xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                        <w:top w:w="80" w:type="dxa"/>
-                        <w:left w:w="120" w:type="dxa"/>
-                        <w:bottom w:w="80" w:type="dxa"/>
-                        <w:right w:w="120" w:type="dxa"/>
+                        <w:top w:w="120" w:type="dxa"/>
+                        <w:left w:w="160" w:type="dxa"/>
+                        <w:bottom w:w="120" w:type="dxa"/>
+                        <w:right w:w="160" w:type="dxa"/>
                     </w:tcMar>
                 ''')
                 tcPr.append(tcMar)
@@ -184,9 +195,9 @@ def build_project_report():
                 # Paragraph styling in cell - left align to prevent word stretching
                 for p in cell.paragraphs:
                     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                    p.paragraph_format.space_before = Pt(1)
-                    p.paragraph_format.space_after = Pt(1)
-                    p.paragraph_format.line_spacing = 1.05
+                    p.paragraph_format.space_before = Pt(2)
+                    p.paragraph_format.space_after = Pt(2)
+                    p.paragraph_format.line_spacing = 1.10
                     for r in p.runs:
                         r.font.name = "Times New Roman"
                         if row_idx == 0 and headers:
@@ -404,32 +415,32 @@ def build_project_report():
         ("1", "PROBLEM ANALYSIS AND DESIGN", "1"),
         ("", "  1.1 PROBLEM DEFINITION", "1"),
         ("", "      1.1.1 Problem Statement", "1"),
-        ("", "      1.1.2 Project Objectives", "2"),
+        ("", "      1.1.2 Project Objectives", "1"),
         ("", "      1.1.3 Requirements Specification", "2"),
-        ("", "  1.2 SDG RELEVANCE (SDG 9, 11, 13)", "4"),
-        ("", "  1.3 PROPOSED SYSTEM AND CORE ARCHITECTURAL APPROACH", "4"),
-        ("", "  1.4 OBJECT-ORIENTED ANALYSIS AND DESIGN (OOAD)", "5"),
-        ("", "  1.5 DATA STRUCTURES AND ALGORITHM SELECTION", "5"),
-        ("", "  1.6 SYSTEM ARCHITECTURE AND METHODOLOGY", "6"),
-        ("", "  1.7 PROJECT PLANNING AND RISK MANAGEMENT", "6"),
-        ("2", "IMPLEMENTATION AND TECHNICAL DEMONSTRATION", "8"),
-        ("", "  2.1 TECHNOLOGY STACK", "8"),
-        ("", "  2.2 FRONTEND DESIGN AND USER INTERFACE", "8"),
-        ("", "  2.3 DATABASE DESIGN AND RELATIONAL SCHEMA", "9"),
-        ("", "  2.4 IMPLEMENTATION OF CORE MODULES", "9"),
-        ("", "  2.5 COMPLETE WORKING DEMONSTRATION", "10"),
-        ("", "      2.5.1 User Interface and Database Management Screenshots", "12"),
-        ("3", "TESTING, RESULTS AND EVALUATION", "13"),
-        ("", "  3.1 TESTING AND VALIDATION METHODOLOGY", "13"),
-        ("", "      3.1.1 Defect Resolution & Bug Correction History", "14"),
-        ("", "  3.2 EMPIRICAL RESULTS AND PERFORMANCE ANALYSIS", "14"),
-        ("", "  3.3 SUSTAINABILITY, COST AND RESOURCE EFFICIENCY", "15"),
-        ("", "  3.4 SYSTEM LIMITATIONS AND FUTURE ENHANCEMENTS", "15"),
-        ("4", "GITHUB AND CONCLUSION", "16"),
-        ("", "  4.1 GITHUB REPOSITORY AND VERSION CONTROL", "16"),
-        ("", "  4.2 CONCLUSION", "17"),
-        ("", "REFERENCES", "18"),
-        ("", "APPENDIX (CODE)", "19")
+        ("", "  1.2 SDG RELEVANCE (SDG 9, 11, 13)", "5"),
+        ("", "  1.3 PROPOSED SYSTEM AND CORE ARCHITECTURAL APPROACH", "5"),
+        ("", "  1.4 OBJECT-ORIENTED ANALYSIS AND DESIGN (OOAD)", "6"),
+        ("", "  1.5 DATA STRUCTURES AND ALGORITHM SELECTION", "6"),
+        ("", "  1.6 SYSTEM ARCHITECTURE AND METHODOLOGY", "7"),
+        ("", "  1.7 PROJECT PLANNING AND RISK MANAGEMENT", "7"),
+        ("2", "IMPLEMENTATION AND TECHNICAL DEMONSTRATION", "9"),
+        ("", "  2.1 TECHNOLOGY STACK", "9"),
+        ("", "  2.2 FRONTEND DESIGN AND USER INTERFACE", "9"),
+        ("", "  2.3 DATABASE DESIGN AND RELATIONAL SCHEMA", "10"),
+        ("", "  2.4 IMPLEMENTATION OF CORE MODULES", "10"),
+        ("", "  2.5 COMPLETE WORKING DEMONSTRATION", "11"),
+        ("", "      2.5.1 User Interface and Database Management Screenshots", "13"),
+        ("3", "TESTING, RESULTS AND EVALUATION", "14"),
+        ("", "  3.1 TESTING AND VALIDATION METHODOLOGY", "14"),
+        ("", "      3.1.1 Defect Resolution & Bug Correction History", "15"),
+        ("", "  3.2 EMPIRICAL RESULTS AND PERFORMANCE ANALYSIS", "15"),
+        ("", "  3.3 SUSTAINABILITY, COST AND RESOURCE EFFICIENCY", "16"),
+        ("", "  3.4 SYSTEM LIMITATIONS AND FUTURE ENHANCEMENTS", "17"),
+        ("4", "GITHUB AND CONCLUSION", "18"),
+        ("", "  4.1 GITHUB REPOSITORY AND VERSION CONTROL", "18"),
+        ("", "  4.2 CONCLUSION", "19"),
+        ("", "REFERENCES", "20"),
+        ("", "APPENDIX (CODE)", "21")
     ]
     
     toc_table = doc.add_table(rows=len(toc_data), cols=3)
@@ -491,9 +502,10 @@ def build_project_report():
     bullet_p("5. Bidirectional Database Synchronization: ", "Establish live, two-way JDBC integration with MySQL/MariaDB via phpMyAdmin, allowing administrative changes in the database to reflect instantly on the web UI within 3 seconds, and logging all transit events persistently.")
 
     h3_subsec("1.1.3", "Requirements Specification")
-    body_p("The project requirements were established through detailed analysis of municipal transit operations, categorized into functional and non-functional specifications:")
+    body_p("The project requirements were established through detailed analysis of municipal transit operations, categorized into functional and non-functional specifications. Table 1.1 formalizes the functional capabilities designed into the transit orchestration framework:")
 
-    p_text("Table 1.1: Functional Requirements Specification", size=10.5, bold=True, space_before=6, space_after=3)
+    # Table 1.1: Functional Requirements
+    table_caption("Table 1.1: Functional Requirements Specification")
     fr_table = doc.add_table(rows=7, cols=3)
     fr_data = [
         ("Req ID", "Requirement Category", "Functional Specification Description"),
@@ -508,8 +520,12 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = fr_data[r_i][c_i]
     style_table(fr_table, [Inches(1.0), Inches(1.8), Inches(3.7)])
+    table_spacer()
 
-    p_text("Table 1.2: Non-Functional Requirements Specification", size=10.5, bold=True, space_before=8, space_after=3)
+    body_p("To ensure that the functional capabilities outlined in Table 1.1 operate reliably under peak municipal commuter loads, a complementary suite of non-functional requirements was formulated. Table 1.2 establishes rigorous latency thresholds, database consistency constraints, and interface response criteria:")
+
+    # Table 1.2: Non-Functional Requirements
+    table_caption("Table 1.2: Non-Functional Requirements Specification")
     nfr_table = doc.add_table(rows=6, cols=3)
     nfr_data = [
         ("Req ID", "Quality Attribute", "Evaluation Benchmark and Target Metric"),
@@ -523,8 +539,12 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = nfr_data[r_i][c_i]
     style_table(nfr_table, [Inches(1.0), Inches(1.8), Inches(3.7)])
+    table_spacer()
 
-    p_text("Table 1.3: Vetrinagar Municipal Transit Network Nodes", size=10.5, bold=True, space_before=8, space_after=3)
+    body_p("The operational scope of these requirements was modeled upon the municipal geography of Vetrinagar. The transit network comprises 13 strategically designated halt nodes, anchored by the Central Depot (D00) as the administrative and fleet staging base, alongside 12 passenger stations spanning commercial, educational, and residential quarters as detailed in Table 1.3:")
+
+    # Table 1.3: Municipal Halts
+    table_caption("Table 1.3: Vetrinagar Municipal Transit Network Nodes")
     stops_table = doc.add_table(rows=14, cols=4)
     stops_data = [
         ("Node ID", "Halt Name", "Node Type", "Zone Description & Transit Function"),
@@ -546,6 +566,7 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = stops_data[r_i][c_i]
     style_table(stops_table, [Inches(0.9), Inches(1.8), Inches(1.1), Inches(2.7)])
+    table_spacer()
 
     h2_sec("1.2", "SUSTAINABLE DEVELOPMENT GOAL (SDG) RELEVANCE")
     body_p("The United Nations 2030 Agenda for Sustainable Development outlines 17 integrated Sustainable Development Goals (SDGs) as an urgent call for action by all countries. The Smart Public Transportation Route Optimization System is directly aligned with three key global goals:")
@@ -577,9 +598,10 @@ def build_project_report():
     bullet_p("Abstraction: ", "Routing and demand management interfaces (such as Router and DemandPolicy) decouple algorithmic solvers from business models. This allows future plug-and-play substitutions of Dijkstra with A* or multi-criteria Pareto optimizers without modifying the core transit service orchestrator.")
 
     h2_sec("1.5", "DATA STRUCTURES AND ALGORITHM SELECTION")
-    body_p("Efficient algorithmic execution is paramount for real-time transit dispatching. The selection of core data structures and algorithmic routines was established based on computational complexity, memory footprint, and real-time execution guarantees. The algorithmic complexity analysis of all primary system operations is summarized in Table 1.4:")
+    body_p("Efficient algorithmic execution is paramount for real-time transit dispatching. The selection of core data structures and algorithmic routines was established based on computational complexity, memory footprint, and real-time execution guarantees. Table 1.4 outlines the algorithmic complexity analysis of all primary system operations:")
 
-    p_text("Table 1.4: Algorithmic Complexity Analysis of Core Operations", size=10.5, bold=True, space_before=6, space_after=3)
+    # Table 1.4: Algorithmic Complexity (Table kept intact with NO surrounding wordings)
+    table_caption("Table 1.4: Algorithmic Complexity Analysis of Core Operations")
     algo_table = doc.add_table(rows=6, cols=4)
     algo_data = [
         ("System Operation", "Underlying Data Structure", "Time Complexity", "Space Complexity"),
@@ -593,6 +615,7 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = algo_data[r_i][c_i]
     style_table(algo_table, [Inches(1.8), Inches(2.2), Inches(1.4), Inches(1.1)])
+    table_spacer()
 
     h2_sec("1.6", "SYSTEM ARCHITECTURE AND METHODOLOGY")
     body_p("The system architecture follows a clean 4-tier modular design pattern, separating presentation, business logic, algorithmic computation, and persistence:")
@@ -608,7 +631,8 @@ def build_project_report():
     bullet_p("Sprint 3 (Weeks 5-6): Web Server & Interactive SVG Dashboard: ", "Built the lightweight Java HTTP REST API server, designed the dynamic 840x620 SVG transit canvas with pulsing crowd indicators, and connected operator dispatch actions.")
     bullet_p("Sprint 4 (Weeks 7-8): MariaDB/MySQL Integration & Stress Validation: ", "Engineered the DatabaseManager with JDBC connectivity, established the 3.0-second bidirectional synchronization daemon with phpMyAdmin, conducted stress testing, and prepared documentation.")
 
-    p_text("Table 1.5: Team Member Roles and Responsibilities", size=10.5, bold=True, space_before=6, space_after=3)
+    # Table 1.5: Team Member Roles
+    table_caption("Table 1.5: Team Member Roles and Responsibilities")
     team_roles_table = doc.add_table(rows=4, cols=3)
     team_roles_data = [
         ("Roll Number", "Team Member Name", "Assigned Technical Modules & Responsibilities"),
@@ -620,8 +644,12 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = team_roles_data[r_i][c_i]
     style_table(team_roles_table, [Inches(1.1), Inches(1.8), Inches(3.6)])
+    table_spacer()
 
-    p_text("Table 1.6: Risk Management and Mitigation Protocol", size=10.5, bold=True, space_before=8, space_after=3)
+    body_p("In conjunction with the sprint division, an operational risk analysis was conducted to preempt system bottlenecks. Each technical contingency was graded by severity and likelihood, pairing each vulnerability with an automated failover or algorithmic fallback protocol as summarized in Table 1.6:")
+
+    # Table 1.6: Risk Management
+    table_caption("Table 1.6: Risk Management and Mitigation Protocol")
     risk_table = doc.add_table(rows=5, cols=4)
     risk_data = [
         ("Risk Description", "Severity", "Probability", "Mitigation Strategy Implemented"),
@@ -634,6 +662,7 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = risk_data[r_i][c_i]
     style_table(risk_table, [Inches(1.8), Inches(0.9), Inches(0.9), Inches(2.9)])
+    table_spacer()
 
     # =========================================================================
     # CHAPTER 2: IMPLEMENTATION AND TECHNICAL DEMONSTRATION
@@ -641,9 +670,10 @@ def build_project_report():
     h1_chap("2", "IMPLEMENTATION AND TECHNICAL DEMONSTRATION")
 
     h2_sec("2.1", "TECHNOLOGY STACK")
-    body_p("The system was implemented using modern, production-grade engineering tools selected for strict deterministic execution, zero runtime bloat, and enterprise compatibility:")
+    body_p("The system was implemented using modern, production-grade engineering tools selected for strict deterministic execution, zero runtime bloat, and enterprise compatibility. Table 2.1 documents the architectural justification for each selected framework and component:")
 
-    p_text("Table 2.1: Technical Stack Specifications", size=10.5, bold=True, space_before=6, space_after=3)
+    # Table 2.1: Technology Stack
+    table_caption("Table 2.1: Technical Stack Specifications")
     tech_table = doc.add_table(rows=6, cols=3)
     tech_data = [
         ("Technology Layer", "Software / Framework", "Selected Version & Technical Justification"),
@@ -657,6 +687,7 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = tech_data[r_i][c_i]
     style_table(tech_table, [Inches(1.5), Inches(1.8), Inches(3.2)])
+    table_spacer()
 
     h2_sec("2.2", "FRONTEND DESIGN AND USER INTERFACE")
     body_p("The user interface was crafted to provide municipal transit operators with instant situational awareness. The central feature is an interactive Scalable Vector Graphics (SVG) canvas rendering the 13 nodes and 44 road segments of Vetrinagar on an 840x620 coordinate plane.")
@@ -668,9 +699,10 @@ def build_project_report():
     bullet_p("Relief Dispatch Control Panel: ", "Operators can inspect the top-ranked demand batch from the PriorityQueue with a single click, review recommended best-fit buses, and trigger two-stage route planning with real-time SVG path highlighting.")
 
     h2_sec("2.3", "DATABASE DESIGN AND RELATIONAL SCHEMA")
-    body_p("The persistence layer is structured around five normalized relational tables in MySQL (transport_optimization database), guaranteeing relational integrity, fast index lookups, and complete transactional logging:")
+    body_p("The persistence layer is structured around five normalized relational tables in MySQL (transport_optimization database), guaranteeing relational integrity, fast index lookups, and complete transactional logging as detailed in Table 2.2:")
 
-    p_text("Table 2.2: Relational Database Schema Architecture", size=10.5, bold=True, space_before=6, space_after=3)
+    # Table 2.2: Relational Database Schema
+    table_caption("Table 2.2: Relational Database Schema Architecture")
     db_schema_table = doc.add_table(rows=6, cols=4)
     db_schema_data = [
         ("Table Name", "Primary Key", "Foreign Keys", "Description & Key Attributes Stored"),
@@ -684,6 +716,7 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = db_schema_data[r_i][c_i]
     style_table(db_schema_table, [Inches(1.2), Inches(1.1), Inches(1.3), Inches(2.9)])
+    table_spacer()
 
     h2_sec("2.4", "IMPLEMENTATION OF CORE MODULES")
     body_p("The system comprises four core functional modules implemented in clean Java 21:")
@@ -751,7 +784,7 @@ while (!pq.isEmpty()) {
 
     body_p("The successful automated execution of this operational cycle confirms the end-to-end reliability of the transit dispatch pipeline. Commuter demand was aggregated seamlessly without thread contention, the PriorityQueue surfaced the highest-density cluster in sub-millisecond time, and the Dijkstra two-segment routing engine selected the optimal path avoiding congested corridors. Real-time vehicle capacity was deducted accurately and immediately synchronized with MySQL over JDBC, providing municipal dispatchers with complete situational awareness.")
 
-    # Section 2.5.1: User Interface and Database Management Evidence (Screenshots)
+    # Section 2.5.1: User Interface and Database Management Evidence (Screenshots - clean, no figure wordings)
     doc.add_page_break()
     h3_subsec("2.5.1", "User Interface and Database Management Evidence (Screenshots)")
 
@@ -779,9 +812,10 @@ while (!pq.isEmpty()) {
     h1_chap("3", "TESTING, RESULTS AND EVALUATION")
 
     h2_sec("3.1", "TESTING AND VALIDATION METHODOLOGY")
-    body_p("A rigorous testing methodology comprising Unit Testing, Boundary Value Analysis, Stress Testing, and End-to-End Integration Validation was applied to certify system robustness. The test suite validated normal execution conditions, boundary threshold scenarios, and intentional error injections.")
+    body_p("A rigorous testing methodology comprising Unit Testing, Boundary Value Analysis, Stress Testing, and End-to-End Integration Validation was applied to certify system robustness. The test suite validated normal execution conditions, boundary threshold scenarios, and intentional error injections. Table 3.1 details the test execution matrix and verification outcomes:")
 
-    p_text("Table 3.1: Comprehensive System Test Cases and Validation Results", size=10.5, bold=True, space_before=6, space_after=3)
+    # Table 3.1: Test Cases
+    table_caption("Table 3.1: Comprehensive System Test Cases and Validation Results")
     test_tbl = doc.add_table(rows=11, cols=5)
     test_data = [
         ("Test ID", "Test Scenario", "Input Data", "Expected Result", "Status"),
@@ -800,6 +834,7 @@ while (!pq.isEmpty()) {
         for c_i, cell in enumerate(row.cells):
             cell.text = test_data[r_i][c_i]
     style_table(test_tbl, [Inches(0.8), Inches(1.8), Inches(1.7), Inches(1.6), Inches(0.6)])
+    table_spacer()
 
     # System Debugging History
     h3_subsec("3.1.1", "Defect Resolution & Bug Correction History")
@@ -809,9 +844,10 @@ while (!pq.isEmpty()) {
     bullet_p("3. SQL Foreign Key Import Order: ", "Initial table drop scripts failed due to circular foreign key dependencies between roads and stops. This was resolved by wrapping database migration scripts with SET FOREIGN_KEY_CHECKS = 0; and restoring with SET FOREIGN_KEY_CHECKS = 1;.")
 
     h2_sec("3.2", "EMPIRICAL RESULTS AND PERFORMANCE ANALYSIS")
-    body_p("The operational efficacy of the system was benchmarked against traditional static transit scheduling across a simulated 30-day operational period for Vetrinagar Municipality. The comparative results demonstrate substantial performance improvements across all operational indicators:")
+    body_p("The operational efficacy of the system was benchmarked against traditional static transit scheduling across a simulated 30-day operational period for Vetrinagar Municipality. The comparative results demonstrate substantial performance improvements across all operational indicators as summarized in Table 3.2:")
 
-    p_text("Table 3.2: Operational Performance Comparison (Static vs. Proposed System)", size=10.5, bold=True, space_before=6, space_after=3)
+    # Table 3.2: Performance Benchmarks
+    table_caption("Table 3.2: Operational Performance Comparison (Static vs. Proposed System)")
     results_tbl = doc.add_table(rows=6, cols=4)
     results_data = [
         ("Performance Metric Indicator", "Traditional Fixed Schedule", "Proposed Dynamic Optimization", "Verified Improvement"),
@@ -825,6 +861,7 @@ while (!pq.isEmpty()) {
         for c_i, cell in enumerate(row.cells):
             cell.text = results_data[r_i][c_i]
     style_table(results_tbl, [Inches(2.2), Inches(1.8), Inches(1.8), Inches(1.2)])
+    table_spacer()
 
     body_p("Key quantitative conclusions derived from the empirical evaluation:")
     bullet_p("Route Planning Latency: ", "Dijkstra’s algorithm across the 13-node, 44-edge network achieved an average execution latency of 1.42 milliseconds, well within real-time operational limits.")
@@ -880,7 +917,8 @@ while (!pq.isEmpty()) {
     bullet_p("Step 3 (Compile & Run): ", "Execute javac -cp 'lib/*' -d bin src/main/java/org/vetrinagar/**/*.java and launch via java -cp 'lib/*;bin' org.vetrinagar.Main --web.")
     bullet_p("Step 4 (Access Interfaces): ", "Open http://localhost:8080/ for the web dashboard and http://localhost/phpmyadmin/ for database inspection.")
 
-    p_text("Table 4.1: Verified Git Commit History Highlights", size=10.5, bold=True, space_before=8, space_after=3)
+    # Table 4.1: Git Commits
+    table_caption("Table 4.1: Verified Git Commit History Highlights")
     git_table = doc.add_table(rows=6, cols=3)
     git_data = [
         ("Commit Hash", "Date & Timestamp", "Commit Message Summary & Scope"),
@@ -894,6 +932,7 @@ while (!pq.isEmpty()) {
         for c_i, cell in enumerate(row.cells):
             cell.text = git_data[r_i][c_i]
     style_table(git_table, [Inches(1.1), Inches(1.6), Inches(3.8)])
+    table_spacer()
 
     h2_sec("4.2", "CONCLUSION")
     body_p("The Smart Public Transportation Route Optimization System successfully resolves the persistent challenge of urban transit unreliability, peak-hour passenger overcrowding, and fuel-inefficient fleet deployment. By unifying Dijkstra’s Shortest Path Algorithm on a weighted directed graph with binary max-heap demand prioritization and dynamic capacity deduction, the system demonstrates how classical algorithmic techniques can be translated into transformative civic smart-city solutions.")
