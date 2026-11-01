@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Vetrinagar Smart Public Transit Route Optimization
  * Full-Featured Frontend Controller with Sidebar Navigation,
  * Role-Based Authentication, Interactive Transit Map, and SQLite Explorer.
@@ -290,6 +290,17 @@ async function fetchTransitData() {
         state.allDemand = data.allDemand || [];
         state.trips = data.trips || [];
         state.metrics = data.metrics || {};
+        state.database = data.database || null;
+
+        // Update database indicator in sidebar
+        if (data.database) {
+            const sideDb = document.getElementById('side-db-status');
+            if (sideDb) {
+                const dbName = data.database.name || 'transport_optimization';
+                const pmaUrl = data.database.phpmyadminUrl || '/phpmyadmin';
+                sideDb.innerHTML = `<a href="${pmaUrl}" target="_blank" style="color:inherit; text-decoration:none; font-weight:600;" title="Click to open phpMyAdmin in new tab">🗄️ MySQL: <u>${dbName}</u> ↗</a>`;
+            }
+        }
 
         renderTopHeaderStats();
         renderSVGMap();
@@ -302,6 +313,17 @@ async function fetchTransitData() {
         updatePassengerStatusCard();
     } catch (e) {
         console.warn('Transit data polling note:', e);
+    }
+}
+
+async function syncWithDatabase() {
+    try {
+        const res = await fetch('/api/database/sync', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message || 'Live synchronized with MySQL database (phpMyAdmin)!', 'info');
+        await fetchTransitData();
+    } catch (e) {
+        showToast('Sync error: ' + e.message, 'error');
     }
 }
 
