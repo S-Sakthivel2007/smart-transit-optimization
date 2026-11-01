@@ -25,3 +25,9 @@ Thumbs.db
 # Python virtual environment & temporary template extracts
 .venv/
 template_extracted/
+
+# Root binary build outputs (tracked versions are in docs/)
+/Smart_Public_Transportation_Route_Optimization_Project_Report.docx
+/Smart_Public_Transportation_Route_Optimization_Project_Report.pdf
+export_pdf.ps1
+inspect_pages.ps1
