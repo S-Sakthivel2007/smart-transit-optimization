@@ -125,32 +125,20 @@ def build_project_report():
         p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         p.paragraph_format.space_before = Pt(4)
         p.paragraph_format.space_after = Pt(8)
-        p.paragraph_format.line_spacing = 1.05
-        p.paragraph_format.left_indent = Inches(0.2)
+        p.paragraph_format.line_spacing = 1.10
+        p.paragraph_format.left_indent = Inches(0.4)
         p.paragraph_format.right_indent = Inches(0.2)
         
-        pPr = p._p.get_or_add_pPr()
-        pBdr = parse_xml(r'''
-            <w:pBdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                <w:top w:val="single" w:sz="6" w:space="4" w:color="CBD5E1"/>
-                <w:left w:val="single" w:sz="18" w:space="8" w:color="2563EB"/>
-                <w:bottom w:val="single" w:sz="6" w:space="4" w:color="CBD5E1"/>
-                <w:right w:val="single" w:sz="6" w:space="4" w:color="CBD5E1"/>
-            </w:pBdr>
-        ''')
-        pPr.append(pBdr)
-        
-        shd = parse_xml(r'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="clear" w:color="auto" w:fill="F8FAFC"/>')
-        pPr.append(shd)
-
+        # Pure code listing without surrounding box or background rectangle
         run = p.add_run(code_text)
         run.font.name = "Consolas"
         run.font.size = Pt(9.0)
         run.font.color.rgb = RGBColor(15, 23, 42)
         return p
 
-    def style_table(table, col_widths, headers=True):
+    def style_table(table, col_widths, alignments=None, headers=True):
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        num_rows = len(table.rows)
         for row_idx, row in enumerate(table.rows):
             trPr = row._tr.get_or_add_trPr()
             trPr.append(parse_xml(r'<w:cantSplit xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'))
@@ -162,50 +150,63 @@ def build_project_report():
                 cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                 tcPr = cell._tc.get_or_add_tcPr()
                 
-                # Borders
-                tcBorders = parse_xml(r'''
+                # Humanized academic table borders
+                top_color = "334155" if row_idx == 0 else "CBD5E1"
+                top_sz = "8" if row_idx == 0 else "4"
+                bot_color = "334155" if (row_idx == 0 and headers) or (row_idx == num_rows - 1) else "CBD5E1"
+                bot_sz = "8" if (row_idx == 0 and headers) or (row_idx == num_rows - 1) else "4"
+
+                tcBorders = parse_xml(f'''
                     <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                        <w:top w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>
+                        <w:top w:val="single" w:sz="{top_sz}" w:space="0" w:color="{top_color}"/>
                         <w:left w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>
-                        <w:bottom w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>
+                        <w:bottom w:val="single" w:sz="{bot_sz}" w:space="0" w:color="{bot_color}"/>
                         <w:right w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>
                     </w:tcBorders>
                 ''')
                 tcPr.append(tcBorders)
 
-                # Shading
+                # Shading: clean academic soft tint for header, pure white / subtle tint for data rows
                 if row_idx == 0 and headers:
-                    shd = parse_xml(r'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="clear" w:color="auto" w:fill="1E293B"/>')
+                    shd = parse_xml(r'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="clear" w:color="auto" w:fill="F1F5F9"/>')
                     tcPr.append(shd)
                 elif row_idx % 2 == 1:
                     shd = parse_xml(r'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="clear" w:color="auto" w:fill="F8FAFC"/>')
+                    tcPr.append(shd)
+                else:
+                    shd = parse_xml(r'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="clear" w:color="auto" w:fill="FFFFFF"/>')
                     tcPr.append(shd)
 
                 # Generous Cell Padding for Clean Visual Breathing Room
                 tcMar = parse_xml(r'''
                     <w:tcMar xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
                         <w:top w:w="120" w:type="dxa"/>
-                        <w:left w:w="160" w:type="dxa"/>
+                        <w:left w:w="150" w:type="dxa"/>
                         <w:bottom w:w="120" w:type="dxa"/>
-                        <w:right w:w="160" w:type="dxa"/>
+                        <w:right w:w="150" w:type="dxa"/>
                     </w:tcMar>
                 ''')
                 tcPr.append(tcMar)
 
-                # Paragraph styling in cell - left align to prevent word stretching
+                # Alignment: custom per-column or standard left
+                col_align = WD_ALIGN_PARAGRAPH.LEFT
+                if alignments and col_idx < len(alignments):
+                    col_align = alignments[col_idx]
+
                 for p in cell.paragraphs:
-                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                    p.alignment = col_align
                     p.paragraph_format.space_before = Pt(2)
                     p.paragraph_format.space_after = Pt(2)
-                    p.paragraph_format.line_spacing = 1.10
+                    p.paragraph_format.line_spacing = 1.15
                     for r in p.runs:
                         r.font.name = "Times New Roman"
                         if row_idx == 0 and headers:
                             r.font.size = Pt(10.5)
                             r.bold = True
-                            r.font.color.rgb = RGBColor(255, 255, 255)
+                            r.font.color.rgb = RGBColor(15, 23, 42)
                         else:
                             r.font.size = Pt(10.0)
+                            r.font.color.rgb = RGBColor(0, 0, 0)
 
     # =========================================================================
     # PRELIMINARY PAGE 1: TITLE / COVER PAGE
@@ -466,11 +467,33 @@ def build_project_report():
             
             run = p.runs[0]
             run.font.name = "Times New Roman"
+            tcPr = cell._tc.get_or_add_tcPr()
             if r_i == 0:
                 run.bold = True
                 run.font.size = Pt(10)
-                tcPr = cell._tc.get_or_add_tcPr()
                 tcPr.append(parse_xml(r'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="clear" w:color="auto" w:fill="F1F5F9"/>'))
+                tcPr.append(parse_xml(r'''
+                    <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                        <w:top w:val="single" w:sz="8" w:space="0" w:color="334155"/>
+                        <w:left w:val="none"/>
+                        <w:bottom w:val="single" w:sz="8" w:space="0" w:color="334155"/>
+                        <w:right w:val="none"/>
+                    </w:tcBorders>
+                '''))
+            elif r_i == len(toc_table.rows) - 1:
+                if toc_data[r_i][0] != "":
+                    run.bold = True
+                    run.font.size = Pt(9.5)
+                else:
+                    run.font.size = Pt(9.0)
+                tcPr.append(parse_xml(r'''
+                    <w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                        <w:top w:val="none"/>
+                        <w:left w:val="none"/>
+                        <w:bottom w:val="single" w:sz="8" w:space="0" w:color="334155"/>
+                        <w:right w:val="none"/>
+                    </w:tcBorders>
+                '''))
             elif toc_data[r_i][0] != "":
                 run.bold = True
                 run.font.size = Pt(9.5)
@@ -519,7 +542,7 @@ def build_project_report():
     for r_i, row in enumerate(fr_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = fr_data[r_i][c_i]
-    style_table(fr_table, [Inches(1.0), Inches(1.8), Inches(3.7)])
+    style_table(fr_table, [Inches(1.0), Inches(1.8), Inches(3.7)], alignments=[WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.LEFT])
     table_spacer()
 
     body_p("To ensure that the functional capabilities outlined in Table 1.1 operate reliably under peak municipal commuter loads, a complementary suite of non-functional requirements was formulated. Table 1.2 establishes rigorous latency thresholds, database consistency constraints, and interface response criteria:")
@@ -538,7 +561,7 @@ def build_project_report():
     for r_i, row in enumerate(nfr_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = nfr_data[r_i][c_i]
-    style_table(nfr_table, [Inches(1.0), Inches(1.8), Inches(3.7)])
+    style_table(nfr_table, [Inches(1.0), Inches(1.8), Inches(3.7)], alignments=[WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.LEFT])
     table_spacer()
 
     body_p("The operational scope of these requirements was modeled upon the municipal geography of Vetrinagar. The transit network comprises 13 strategically designated halt nodes, anchored by the Central Depot (D00) as the administrative and fleet staging base, alongside 12 passenger stations spanning commercial, educational, and residential quarters as detailed in Table 1.3:")
@@ -565,7 +588,7 @@ def build_project_report():
     for r_i, row in enumerate(stops_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = stops_data[r_i][c_i]
-    style_table(stops_table, [Inches(0.9), Inches(1.8), Inches(1.1), Inches(2.7)])
+    style_table(stops_table, [Inches(0.9), Inches(1.8), Inches(1.1), Inches(2.7)], alignments=[WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT])
     table_spacer()
 
     h2_sec("1.2", "SUSTAINABLE DEVELOPMENT GOAL (SDG) RELEVANCE")
@@ -614,7 +637,7 @@ def build_project_report():
     for r_i, row in enumerate(algo_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = algo_data[r_i][c_i]
-    style_table(algo_table, [Inches(1.8), Inches(2.2), Inches(1.4), Inches(1.1)])
+    style_table(algo_table, [Inches(1.8), Inches(2.2), Inches(1.4), Inches(1.1)], alignments=[WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.CENTER])
     table_spacer()
 
     h2_sec("1.6", "SYSTEM ARCHITECTURE AND METHODOLOGY")
@@ -643,7 +666,7 @@ def build_project_report():
     for r_i, row in enumerate(team_roles_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = team_roles_data[r_i][c_i]
-    style_table(team_roles_table, [Inches(1.1), Inches(1.8), Inches(3.6)])
+    style_table(team_roles_table, [Inches(1.1), Inches(1.8), Inches(3.6)], alignments=[WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.LEFT])
     table_spacer()
 
     body_p("In conjunction with the sprint division, an operational risk analysis was conducted to preempt system bottlenecks. Each technical contingency was graded by severity and likelihood, pairing each vulnerability with an automated failover or algorithmic fallback protocol as summarized in Table 1.6:")
@@ -661,7 +684,7 @@ def build_project_report():
     for r_i, row in enumerate(risk_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = risk_data[r_i][c_i]
-    style_table(risk_table, [Inches(1.8), Inches(0.9), Inches(0.9), Inches(2.9)])
+    style_table(risk_table, [Inches(1.8), Inches(0.9), Inches(0.9), Inches(2.9)], alignments=[WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT])
     table_spacer()
 
     # =========================================================================
@@ -686,14 +709,14 @@ def build_project_report():
     for r_i, row in enumerate(tech_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = tech_data[r_i][c_i]
-    style_table(tech_table, [Inches(1.5), Inches(1.8), Inches(3.2)])
+    style_table(tech_table, [Inches(1.5), Inches(1.8), Inches(3.2)], alignments=[WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.LEFT])
     table_spacer()
 
     h2_sec("2.2", "FRONTEND DESIGN AND USER INTERFACE")
     body_p("The user interface was crafted to provide municipal transit operators with instant situational awareness. The central feature is an interactive Scalable Vector Graphics (SVG) canvas rendering the 13 nodes and 44 road segments of Vetrinagar on an 840x620 coordinate plane.")
 
     body_p("Key interactive elements of the dashboard include:")
-    bullet_p("Dynamic Crowd Badges: ", "When passenger demand is registered at any stop, a glowing badge displays the waiting commuter headcount (e.g., '👥 25'). The badge pulses visually to alert supervisors of critical queue thresholds.")
+    bullet_p("Dynamic Crowd Badges: ", "When passenger demand is registered at any stop, a glowing badge displays the waiting commuter headcount (e.g., 'Pax: 25'). The badge pulses visually to alert supervisors of critical queue thresholds.")
     bullet_p("Real-Time Fleet Markers: ", "Bus icons dynamically indicate vehicle positions, current passenger load, remaining seat availability, and operational status (AVAILABLE, ON_TRIP, or MAINTENANCE).")
     bullet_p("Corridor Congestion Coloring: ", "Road corridors dynamically reflect traffic state: Normal (Green, travel time < 15m), Moderate (Amber, 15-25m), Heavy Traffic (Red, > 25m), and Blocked (Dashed Gray, excluded from routing).")
     bullet_p("Relief Dispatch Control Panel: ", "Operators can inspect the top-ranked demand batch from the PriorityQueue with a single click, review recommended best-fit buses, and trigger two-stage route planning with real-time SVG path highlighting.")
@@ -715,7 +738,7 @@ def build_project_report():
     for r_i, row in enumerate(db_schema_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = db_schema_data[r_i][c_i]
-    style_table(db_schema_table, [Inches(1.2), Inches(1.1), Inches(1.3), Inches(2.9)])
+    style_table(db_schema_table, [Inches(1.2), Inches(1.1), Inches(1.3), Inches(2.9)], alignments=[WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT])
     table_spacer()
 
     h2_sec("2.4", "IMPLEMENTATION OF CORE MODULES")
@@ -795,7 +818,7 @@ while (!pq.isEmpty()) {
         p_img1.paragraph_format.space_after = Pt(2)
         run_img1 = p_img1.add_run()
         run_img1.add_picture(map_img_path, width=Inches(4.6))
-        p_text("Figure 2.1: Live Interactive SVG Transit Map & Fleet Supervisor Dashboard", size=10, italic=True, space_before=1, space_after=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+        p_text("Live Interactive SVG Transit Map & Fleet Supervisor Dashboard", size=10, italic=True, space_before=1, space_after=10, align=WD_ALIGN_PARAGRAPH.CENTER)
 
     if os.path.exists(pma_img_path):
         p_img2 = doc.add_paragraph()
@@ -804,7 +827,7 @@ while (!pq.isEmpty()) {
         p_img2.paragraph_format.space_after = Pt(2)
         run_img2 = p_img2.add_run()
         run_img2.add_picture(pma_img_path, width=Inches(4.6))
-        p_text("Figure 2.2: Live phpMyAdmin Database Management Interface (transport_optimization)", size=10, italic=True, space_before=1, space_after=6, align=WD_ALIGN_PARAGRAPH.CENTER)
+        p_text("Live phpMyAdmin Database Management Interface (transport_optimization)", size=10, italic=True, space_before=1, space_after=6, align=WD_ALIGN_PARAGRAPH.CENTER)
 
     # =========================================================================
     # CHAPTER 3: TESTING, RESULTS AND EVALUATION
@@ -833,7 +856,7 @@ while (!pq.isEmpty()) {
     for r_i, row in enumerate(test_tbl.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = test_data[r_i][c_i]
-    style_table(test_tbl, [Inches(0.8), Inches(1.8), Inches(1.7), Inches(1.6), Inches(0.6)])
+    style_table(test_tbl, [Inches(0.8), Inches(1.8), Inches(1.7), Inches(1.6), Inches(0.6)], alignments=[WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER])
     table_spacer()
 
     # System Debugging History
@@ -860,7 +883,8 @@ while (!pq.isEmpty()) {
     for r_i, row in enumerate(results_tbl.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = results_data[r_i][c_i]
-    style_table(results_tbl, [Inches(2.2), Inches(1.8), Inches(1.8), Inches(1.2)])
+    style_table(results_tbl, [Inches(2.2), Inches(1.8), Inches(1.8), Inches(1.2)], alignments=[WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.CENTER])
+    table_spacer()
     table_spacer()
 
     body_p("Key quantitative conclusions derived from the empirical evaluation:")
@@ -892,24 +916,24 @@ while (!pq.isEmpty()) {
 
     body_p("Repository Folder Structure Overview:")
     code_box("""smart-transit-optimization/
-├── pom.xml                                 # Maven project build configuration
-├── README.md                               # Project documentation & quick-start guide
-├── run.bat                                 # One-click console demo runner
-├── start-website.bat                       # Web server and dashboard launcher
-├── test.bat                                # Automated test suite runner
-├── vetrinagar_transit.sql                  # MySQL/MariaDB database schema & seeds
-├── lib/                                    # Dependencies (mysql-connector-j-9.2.0.jar)
-├── src/main/java/org/vetrinagar/           # Production Java 21 Source Code
-│   ├── Main.java                           # Application entry point (CLI & Web mode)
-│   ├── model/                              # Bus, MiniBus, StandardBus, Stop, Road, etc.
-│   ├── graph/                              # WeightedGraph, DijkstraRouter, RouteResult
-│   ├── service/                            # TransportService (Heap, Queue, Dispatch)
-│   ├── db/                                 # DatabaseManager (MySQL & SQLite)
-│   └── web/                                # WebServer (HTTP REST API endpoints)
-└── website/                                # Frontend UI
-    ├── index.html                          # Interactive SVG Map & Dashboard
-    ├── app.js                              # Client-side state & API communication
-    └── style.css                           # Modern responsive stylesheet""")
+|-- pom.xml                                 # Maven project build configuration
+|-- README.md                               # Project documentation & quick-start guide
+|-- run.bat                                 # One-click console demo runner
+|-- start-website.bat                       # Web server and dashboard launcher
+|-- test.bat                                # Automated test suite runner
+|-- vetrinagar_transit.sql                  # MySQL/MariaDB database schema & seeds
+|-- lib/                                    # Dependencies (mysql-connector-j-9.2.0.jar)
+|-- src/main/java/org/vetrinagar/           # Production Java 21 Source Code
+|   |-- Main.java                           # Application entry point (CLI & Web mode)
+|   |-- model/                              # Bus, MiniBus, StandardBus, Stop, Road, etc.
+|   |-- graph/                              # WeightedGraph, DijkstraRouter, RouteResult
+|   |-- service/                            # TransportService (Heap, Queue, Dispatch)
+|   |-- db/                                 # DatabaseManager (MySQL & SQLite)
+|   \\-- web/                                # WebServer (HTTP REST API endpoints)
+\\-- website/                                # Frontend UI
+    |-- index.html                          # Interactive SVG Map & Dashboard
+    |-- app.js                              # Client-side state & API communication
+    \\-- style.css                           # Modern responsive stylesheet""")
 
     body_p("To execute the project locally, follow the step-by-step procedure:")
     bullet_p("Step 1 (Start Services): ", "Open XAMPP Control Panel and start Apache (Port 80) and MySQL (Port 3306).")
@@ -931,7 +955,7 @@ while (!pq.isEmpty()) {
     for r_i, row in enumerate(git_table.rows):
         for c_i, cell in enumerate(row.cells):
             cell.text = git_data[r_i][c_i]
-    style_table(git_table, [Inches(1.1), Inches(1.6), Inches(3.8)])
+    style_table(git_table, [Inches(1.1), Inches(1.6), Inches(3.8)], alignments=[WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT])
     table_spacer()
 
     h2_sec("4.2", "CONCLUSION")
