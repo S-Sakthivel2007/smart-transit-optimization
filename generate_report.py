@@ -180,10 +180,10 @@ def build_project_report():
                 # Generous Cell Padding for Clean Visual Breathing Room
                 tcMar = parse_xml(r'''
                     <w:tcMar xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                        <w:top w:w="120" w:type="dxa"/>
-                        <w:left w:w="150" w:type="dxa"/>
-                        <w:bottom w:w="120" w:type="dxa"/>
-                        <w:right w:w="150" w:type="dxa"/>
+                        <w:top w:w="80" w:type="dxa"/>
+                        <w:left w:w="140" w:type="dxa"/>
+                        <w:bottom w:w="80" w:type="dxa"/>
+                        <w:right w:w="140" w:type="dxa"/>
                     </w:tcMar>
                 ''')
                 tcPr.append(tcMar)
@@ -195,9 +195,9 @@ def build_project_report():
 
                 for p in cell.paragraphs:
                     p.alignment = col_align
-                    p.paragraph_format.space_before = Pt(2)
-                    p.paragraph_format.space_after = Pt(2)
-                    p.paragraph_format.line_spacing = 1.15
+                    p.paragraph_format.space_before = Pt(1)
+                    p.paragraph_format.space_after = Pt(1)
+                    p.paragraph_format.line_spacing = 1.10
                     for r in p.runs:
                         r.font.name = "Times New Roman"
                         if row_idx == 0 and headers:
@@ -419,17 +419,17 @@ def build_project_report():
         ("", "      1.1.2 Project Objectives", "1"),
         ("", "      1.1.3 Requirements Specification", "2"),
         ("", "  1.2 SDG RELEVANCE (SDG 9, 11, 13)", "5"),
-        ("", "  1.3 PROPOSED SYSTEM AND CORE ARCHITECTURAL APPROACH", "5"),
+        ("", "  1.3 PROPOSED SYSTEM AND CORE ARCHITECTURAL APPROACH", "6"),
         ("", "  1.4 OBJECT-ORIENTED ANALYSIS AND DESIGN (OOAD)", "6"),
-        ("", "  1.5 DATA STRUCTURES AND ALGORITHM SELECTION", "6"),
+        ("", "  1.5 DATA STRUCTURES AND ALGORITHM SELECTION", "7"),
         ("", "  1.6 SYSTEM ARCHITECTURE AND METHODOLOGY", "7"),
-        ("", "  1.7 PROJECT PLANNING AND RISK MANAGEMENT", "7"),
+        ("", "  1.7 PROJECT PLANNING AND RISK MANAGEMENT", "8"),
         ("2", "IMPLEMENTATION AND TECHNICAL DEMONSTRATION", "9"),
         ("", "  2.1 TECHNOLOGY STACK", "9"),
         ("", "  2.2 FRONTEND DESIGN AND USER INTERFACE", "9"),
         ("", "  2.3 DATABASE DESIGN AND RELATIONAL SCHEMA", "10"),
         ("", "  2.4 IMPLEMENTATION OF CORE MODULES", "10"),
-        ("", "  2.5 COMPLETE WORKING DEMONSTRATION", "11"),
+        ("", "  2.5 COMPLETE WORKING DEMONSTRATION", "12"),
         ("", "      2.5.1 User Interface and Database Management Screenshots", "13"),
         ("3", "TESTING, RESULTS AND EVALUATION", "14"),
         ("", "  3.1 TESTING AND VALIDATION METHODOLOGY", "14"),
@@ -685,7 +685,6 @@ def build_project_report():
         for c_i, cell in enumerate(row.cells):
             cell.text = risk_data[r_i][c_i]
     style_table(risk_table, [Inches(1.8), Inches(0.9), Inches(0.9), Inches(2.9)], alignments=[WD_ALIGN_PARAGRAPH.LEFT, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT])
-    table_spacer()
 
     # =========================================================================
     # CHAPTER 2: IMPLEMENTATION AND TECHNICAL DEMONSTRATION
