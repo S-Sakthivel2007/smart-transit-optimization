@@ -182,7 +182,9 @@ function updateUserSessionUI() {
 
     if (nameEl) nameEl.innerText = u.fullName || u.username;
     if (roleEl) roleEl.innerText = u.role;
-    if (avatarEl) avatarEl.innerText = (u.role === 'SUPERVISOR') ? 'ðŸ‘¨â€ðŸ’¼' : 'ðŸ§‘â€ðŸ¦±';
+    if (avatarEl) avatarEl.innerHTML = (u.role === 'SUPERVISOR')
+        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>';
 
     // Show/hide supervisor-only items based on current role
     const supItems = document.querySelectorAll('.supervisor-only');
@@ -298,7 +300,7 @@ async function fetchTransitData() {
             if (sideDb) {
                 const dbName = data.database.name || 'transport_optimization';
                 const pmaUrl = data.database.phpmyadminUrl || '/phpmyadmin';
-                sideDb.innerHTML = `<a href="${pmaUrl}" target="_blank" style="color:inherit; text-decoration:none; font-weight:600;" title="Click to open phpMyAdmin in new tab">🗄️ MySQL: <u>${dbName}</u> ↗</a>`;
+                sideDb.innerHTML = `<a href="${pmaUrl}" target="_blank" style="color:inherit; text-decoration:none; font-weight:600;" title="Click to open phpMyAdmin in new tab">MySQL: <u>${dbName}</u> ↗</a>`;
             }
         }
 
@@ -342,7 +344,7 @@ function renderTopHeaderStats() {
     if (sideBadge) sideBadge.innerText = state.rankedDemand.length;
 
     const sdgCo2 = document.getElementById('sdg-co2-val');
-    if (sdgCo2) sdgCo2.innerText = `${co2} kg COâ‚‚ Avoided`;
+    if (sdgCo2) sdgCo2.innerHTML = `${co2} kg CO<sub>2</sub> Avoided`;
 }
 
 // =========================================================================
@@ -423,7 +425,7 @@ function renderSVGMap() {
 
         // Visual icon emoji for major hubs
         let iconSymbol = s.id;
-        if (isDepot) iconSymbol = 'â˜… D00';
+        if (isDepot) iconSymbol = 'D00';
 
         // Check consolidated waiting crowd at this stop
         const stopWaitingCount = state.rankedDemand
@@ -439,7 +441,7 @@ function renderSVGMap() {
                 ${stopWaitingCount > 0 ? `
                     <g class="crowd-pill" transform="translate(${s.x}, ${s.y - radius - 7})">
                         <rect x="-19" y="-11" width="38" height="14" rx="7" fill="#e11d48" stroke="#ffffff" stroke-width="1.2" />
-                        <text x="0" y="-0.5" fill="#ffffff" font-size="8" font-family="'JetBrains Mono', monospace" font-weight="800" text-anchor="middle">ðŸ‘¥ ${stopWaitingCount}</text>
+                        <text x="0" y="-0.5" fill="#ffffff" font-size="8" font-family="'JetBrains Mono', monospace" font-weight="800" text-anchor="middle">Pax: ${stopWaitingCount}</text>
                     </g>
                 ` : ''}
             </g>
@@ -514,8 +516,8 @@ function renderStopDetailsCard(stopId) {
                 </div>
                 <div style="font-size:0.75rem; color:var(--emerald); margin-top:0.25rem;">
                     ${batches.length > 1 
-                        ? `âš¡ Combined from ${batches.length} commuter bookings at this location` 
-                        : (batches.length === 1 ? `âš¡ 1 Active Consolidated Batch` : `âœ“ No passengers currently waiting`)}
+                        ? `Combined from ${batches.length} commuter bookings at this location` 
+                        : (batches.length === 1 ? `1 Active Consolidated Batch` : `No passengers currently waiting`)}
                 </div>
                 ${batches.length > 0 ? `
                     <div style="margin-top:0.4rem; font-size:0.72rem; color:var(--text-secondary); border-top:1px dashed rgba(255,255,255,0.15); padding-top:0.35rem;">
@@ -568,7 +570,7 @@ async function runDijkstraTester() {
         } else {
             state.activeHighlightedPath = [];
             renderSVGMap();
-            box.innerHTML = `<span style="color:var(--rose);">âš ï¸ ${data.message || 'No feasible route connects these stops.'}</span>`;
+            box.innerHTML = `<span style="color:var(--rose);">Warning: ${data.message || 'No feasible route connects these stops.'}</span>`;
         }
     } catch (e) {
         // Fallback to client-side Dijkstra
@@ -586,7 +588,7 @@ async function runDijkstraTester() {
         } else {
             state.activeHighlightedPath = [];
             renderSVGMap();
-            box.innerHTML = `<span style="color:var(--rose);">âš ï¸ ${local.message || 'No route connects these stops.'}</span>`;
+            box.innerHTML = `<span style="color:var(--rose);">Warning: ${local.message || 'No route connects these stops.'}</span>`;
         }
     }
 }
@@ -956,7 +958,7 @@ function updateLiveStopBusCapacity(pickupStopId) {
             </div>
         `;
     } else {
-        banner.innerHTML = `<span style="color:var(--rose);">âš ï¸ No operational relief buses currently available near this stop.</span>`;
+        banner.innerHTML = `<span style="color:var(--rose);">Warning: No operational relief buses currently available near this stop.</span>`;
     }
 }
 
@@ -985,7 +987,7 @@ async function updatePassengerRoutePreview() {
                 </div>
             `;
         } else {
-            box.innerHTML = `<div style="color:var(--rose); font-size:0.82rem;">âš ï¸ No open road route connects ${pickup} and ${dest}.</div>`;
+            box.innerHTML = `<div style="color:var(--rose); font-size:0.82rem;">Warning: No open road route connects ${pickup} and ${dest}.</div>`;
         }
     } catch (e) {
         console.error(e);
