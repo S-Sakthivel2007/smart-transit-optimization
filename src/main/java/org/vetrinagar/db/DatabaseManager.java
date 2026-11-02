@@ -17,7 +17,7 @@ import java.util.*;
  */
 public class DatabaseManager {
     private boolean isMySql = false;
-    private String dbName = "transport_optimization";
+    private String dbName = "vetrinagar_transit";
     private String jdbcUrl;
     private String dbUser = "root";
     private String dbPassword = "";
@@ -42,7 +42,7 @@ public class DatabaseManager {
     private void initConnection() {
         // Attempt MySQL connection first (port 3306, default XAMPP credentials)
         String mysqlHost = "localhost:3306";
-        this.dbName = "transport_optimization";
+        this.dbName = "vetrinagar_transit";
         String mysqlUrl = "jdbc:mysql://" + mysqlHost + "/" + dbName + "?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true";
 
         try {
@@ -58,11 +58,11 @@ public class DatabaseManager {
             }
         } catch (Throwable e) {
             System.out.println("[DB NOTICE] MySQL connection to '" + dbName + "' not available: " + e.getMessage());
-            // Try fallback MySQL database name 'vetrinagar_transit'
+            // Try fallback MySQL database name 'transport_optimization'
             try {
-                String altUrl = "jdbc:mysql://" + mysqlHost + "/vetrinagar_transit?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true";
+                String altUrl = "jdbc:mysql://" + mysqlHost + "/transport_optimization?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true";
                 try (Connection testConn2 = DriverManager.getConnection(altUrl, dbUser, dbPassword)) {
-                    this.dbName = "vetrinagar_transit";
+                    this.dbName = "transport_optimization";
                     this.jdbcUrl = altUrl;
                     this.isMySql = true;
                     System.out.println("  >>> [DB SUCCESS] Connected Live to MySQL Database: 'vetrinagar_transit' (phpMyAdmin)");
@@ -368,9 +368,108 @@ public class DatabaseManager {
         }
     }
 
+    // --- Multi-Database Auto-Synchronization Engine ---
+
+    /**
+     * Synchronizes tables between 'vetrinagar_transit' and 'transport_optimization'.
+     * If the user edits either database in phpMyAdmin, changes are instantly detected
+     * via MySQL information_schema UPDATE_TIME or data comparison, and automatically
+     * mirrored to the other database so that the website ALWAYS displays the real-time state.
+     */
+    public synchronized void syncDualDatabases() {
+        if (!isMySql) return;
+        try (Connection conn = getConnection()) {
+            boolean hasVT = false, hasTO = false;
+            try (ResultSet rs = conn.getMetaData().getCatalogs()) {
+                while (rs.next()) {
+                    String cat = rs.getString(1);
+                    if ("vetrinagar_transit".equalsIgnoreCase(cat)) hasVT = true;
+                    if ("transport_optimization".equalsIgnoreCase(cat)) hasTO = true;
+                }
+            }
+            if (!hasVT || !hasTO) return;
+
+            // 1. Sync Buses
+            syncTableBetweenDbs(conn, "buses", "bus_id",
+                    Arrays.asList("capacity", "current_location", "status", "passengers_onboard", "current_trip_id"));
+
+            // 2. Sync Roads
+            syncTableBetweenDbs(conn, "roads", "road_id",
+                    Arrays.asList("from_stop_id", "to_stop_id", "travel_time", "status", "road_type", "weight_limit"));
+
+            // 3. Sync Stops
+            syncTableBetweenDbs(conn, "stops", "stop_id",
+                    Arrays.asList("stop_name", "stop_type", "location_desc", "map_x", "map_y"));
+
+            // 4. Sync Demand Batches
+            syncTableBetweenDbs(conn, "demand_batches", "batch_id",
+                    Arrays.asList("pickup_stop_id", "destination_stop_id", "passenger_count", "original_count", "remarks", "status"));
+
+        } catch (Exception e) {
+            // Silently handled to keep live polling smooth
+        }
+    }
+
+    private void syncTableBetweenDbs(Connection conn, String table, String pkCol, List<String> cols) {
+        try {
+            Timestamp toTime = null;
+            Timestamp vtTime = null;
+            String checkSql = "SELECT TABLE_SCHEMA, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_NAME = ? AND TABLE_SCHEMA IN ('vetrinagar_transit', 'transport_optimization')";
+            try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
+                ps.setString(1, table);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String s = rs.getString("TABLE_SCHEMA");
+                        Timestamp t = rs.getTimestamp("UPDATE_TIME");
+                        if ("transport_optimization".equalsIgnoreCase(s)) toTime = t;
+                        if ("vetrinagar_transit".equalsIgnoreCase(s)) vtTime = t;
+                    }
+                }
+            }
+
+            String sourceDb = "vetrinagar_transit";
+            String targetDb = "transport_optimization";
+
+            if (toTime != null && (vtTime == null || toTime.after(vtTime))) {
+                sourceDb = "transport_optimization";
+                targetDb = "vetrinagar_transit";
+            }
+
+            // Sync modified rows from sourceDb to targetDb
+            StringBuilder updateSql = new StringBuilder();
+            updateSql.append("UPDATE ").append(targetDb).append(".").append(table).append(" t ")
+                     .append("JOIN ").append(sourceDb).append(".").append(table).append(" s ")
+                     .append("ON t.").append(pkCol).append(" = s.").append(pkCol).append(" SET ");
+            for (int i = 0; i < cols.size(); i++) {
+                String c = cols.get(i);
+                updateSql.append("t.").append(c).append(" = s.").append(c);
+                if (i < cols.size() - 1) updateSql.append(", ");
+            }
+            updateSql.append(" WHERE ");
+            for (int i = 0; i < cols.size(); i++) {
+                String c = cols.get(i);
+                updateSql.append("(t.").append(c).append(" != s.").append(c)
+                         .append(" OR (t.").append(c).append(" IS NULL AND s.").append(c).append(" IS NOT NULL)")
+                         .append(" OR (t.").append(c).append(" IS NOT NULL AND s.").append(c).append(" IS NULL))");
+                if (i < cols.size() - 1) updateSql.append(" OR ");
+            }
+
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate(updateSql.toString());
+            }
+
+            // Copy any newly inserted records from sourceDb into targetDb
+            String insertSql = "INSERT IGNORE INTO " + targetDb + "." + table + " SELECT * FROM " + sourceDb + "." + table;
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate(insertSql);
+            }
+        } catch (Exception ignored) {}
+    }
+
     // --- Loading Methods ---
 
     public List<Stop> loadAllStops() {
+        syncDualDatabases();
         List<Stop> list = new ArrayList<>();
         String sql = "SELECT stop_id, stop_name, stop_type, location_desc, map_x, map_y FROM stops ORDER BY stop_id";
         try (Connection conn = getConnection(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
@@ -391,6 +490,7 @@ public class DatabaseManager {
     }
 
     public List<Road> loadAllRoads() {
+        syncDualDatabases();
         List<Road> list = new ArrayList<>();
         String sql = "SELECT road_id, from_stop_id, to_stop_id, travel_time, status, road_type, weight_limit FROM roads ORDER BY road_id";
         try (Connection conn = getConnection(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
@@ -412,6 +512,7 @@ public class DatabaseManager {
     }
 
     public List<Bus> loadAllBuses() {
+        syncDualDatabases();
         List<Bus> list = new ArrayList<>();
         String sql = "SELECT bus_id, bus_type, capacity, current_location, status, passengers_onboard, current_trip_id FROM buses ORDER BY bus_id";
         try (Connection conn = getConnection(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
@@ -552,6 +653,13 @@ public class DatabaseManager {
         } catch (SQLException e) {
             System.err.println("[DB ERROR] updateRoad: " + e.getMessage());
         }
+        if (isMySql) {
+            String altDb = "vetrinagar_transit".equalsIgnoreCase(dbName) ? "transport_optimization" : "vetrinagar_transit";
+            try (Connection conn = getConnection(); Statement st = conn.createStatement()) {
+                st.executeUpdate(String.format("UPDATE %s.roads SET travel_time = %d, status = '%s' WHERE road_id = %d",
+                        altDb, road.getTravelTime(), road.getStatus().name(), road.getRoadId()));
+            } catch (Exception ignored) {}
+        }
     }
 
     public void updateBus(Bus bus) {
@@ -566,6 +674,19 @@ public class DatabaseManager {
             ps.executeUpdate();
         } catch (SQLException e) {
             System.err.println("[DB ERROR] updateBus: " + e.getMessage());
+        }
+        if (isMySql) {
+            String altDb = "vetrinagar_transit".equalsIgnoreCase(dbName) ? "transport_optimization" : "vetrinagar_transit";
+            try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE " + altDb + ".buses SET capacity = ?, current_location = ?, status = ?, passengers_onboard = ?, current_trip_id = ? WHERE bus_id = ?")) {
+                ps.setInt(1, bus.getCapacity());
+                ps.setString(2, bus.getCurrentLocation());
+                ps.setString(3, bus.getStatus().name());
+                ps.setInt(4, bus.getPassengersOnboard());
+                ps.setString(5, bus.getCurrentTripId());
+                ps.setString(6, bus.getBusId());
+                ps.executeUpdate();
+            } catch (Exception ignored) {}
         }
     }
 

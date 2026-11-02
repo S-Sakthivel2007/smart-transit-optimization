@@ -141,8 +141,14 @@ public class TransportService {
             // 2. Sync Roads from Database (traffic & status)
             List<Road> dbRoads = dbManager.loadAllRoads();
             for (Road dbRoad : dbRoads) {
-                roadNetwork.updateRoadTravelTime(dbRoad.getRoadId(), dbRoad.getTravelTime());
-                roadNetwork.updateRoadStatus(dbRoad.getRoadId(), dbRoad.getStatus());
+                Road existing = roadNetwork.getRoad(dbRoad.getRoadId());
+                if (existing == null) {
+                    roadNetwork.addRoad(dbRoad);
+                } else {
+                    existing.setWeightLimit(dbRoad.getWeightLimit());
+                    roadNetwork.updateRoadTravelTime(dbRoad.getRoadId(), dbRoad.getTravelTime());
+                    roadNetwork.updateRoadStatus(dbRoad.getRoadId(), dbRoad.getStatus());
+                }
             }
 
             // 3. Sync Stops from Database

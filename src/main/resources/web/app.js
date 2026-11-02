@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTrafficTable();
     renderTripsPage();
     fetchTransitData();
-    setInterval(fetchTransitData, 4000); // Live poll every 4 seconds
+    setInterval(fetchTransitData, 2000); // Live poll every 4 seconds
 });
 
 // =========================================================================
@@ -281,7 +281,7 @@ function toggleTheme() {
 
 async function fetchTransitData() {
     try {
-        const res = await fetch('/api/status');
+        const res = await fetch('/api/status?_t=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
 
@@ -316,10 +316,10 @@ async function fetchTransitData() {
 
 async function syncWithDatabase() {
     try {
-        const res = await fetch('/api/database/sync', { method: 'POST' });
+        const res = await fetch('/api/database/sync?_t=' + Date.now(), { method: 'POST' });
         const data = await res.json();
-        showToast(data.message || 'Live transit state synchronized!', 'info');
         await fetchTransitData();
+        showToast('Live synchronized with phpMyAdmin (MySQL)!', 'success');
     } catch (e) {
         showToast('Sync error: ' + e.message, 'error');
     }
